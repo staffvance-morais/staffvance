@@ -55,8 +55,7 @@ export default function AdminDashboard() {
         <div className="flex justify-between items-start mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Painel da<br/>Administração</h1>
-            {/* Nome do sistema atualizado para WADjet */}
-            <p className="text-sm text-gray-600 mt-1">Gestão centralizada do WADjet</p>
+            <p className="text-sm text-gray-600 mt-1">Gestão centralizada do StaffVance</p>
           </div>
           <button 
             onClick={handleLogout}
