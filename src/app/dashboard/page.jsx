@@ -131,10 +131,6 @@ export default function DashboardFuncionario() {
               </div>
               <h2 className="text-xl font-bold text-gray-800">{perfil?.nome_completo || "Nome não cadastrado"}</h2>
               <p className="text-gray-500 uppercase text-sm font-bold mt-1">{perfil?.cargo || "Staff"}</p>
-              
-              <div className="mt-4 bg-yellow-100 text-yellow-800 px-4 py-1 rounded-full text-sm font-bold border border-yellow-300 flex items-center gap-2">
-                🏆 Nível: {perfil?.emblema || "Bronze"}
-              </div>
             </div>
           </div>
 

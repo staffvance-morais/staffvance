@@ -1,95 +1,217 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@supabase/supabase-js";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+export default function CadastrarFuncionario() {
+  // Estados para o Acesso ao App
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
 
-export default function FuncionariosPage() {
-  const router = useRouter();
-  const [form, setForm] = useState({
-    email: "", senha: "", nome_completo: "", cpf: "", whatsapp: "", data_nascimento: "", chave_pix: "", cargo: "funcionario", emblema: "Bronze", observacoes: "", foto_url: ""
-  });
+  // Estados para Dados Pessoais
+  const [nome, setNome] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [dataNascimento, setDataNascimento] = useState("");
+  const [telefone, setTelefone] = useState("");
+
+  // Estados para Dados Profissionais
+  const [fotoUrl, setFotoUrl] = useState("");
+  const [cargo, setCargo] = useState("");
+  const [nivel, setNivel] = useState("Bronze");
+  const [observacao, setObservacao] = useState("");
+
   const [loading, setLoading] = useState(false);
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-
-  const handleSalvar = async (e) => {
+  const handleCadastro = async (e) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: form.email,
-        password: form.senha,
-      });
-      if (authError) throw authError;
 
-      const { error: dbError } = await supabase.from("perfis").insert([{
-        id: authData.user.id,
-        nome_completo: form.nome_completo,
-        cpf: form.cpf,
-        whatsapp: form.whatsapp,
-        data_nascimento: form.data_nascimento,
-        chave_pix: form.chave_pix,
-        cargo: form.cargo,
-        emblema: form.emblema,
-        observacoes: form.observacoes,
-        foto_url: form.foto_url
-      }]);
-      if (dbError) throw dbError;
+    try {
+      // Enviando todos os dados do formulário para a API no back-end
+      const response = await fetch('/api/cadastrar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email,
+          password: senha,
+          nome_completo: nome,
+          cpf: cpf,
+          data_nascimento: dataNascimento || null,
+          whatsapp: telefone || null,
+          cargo: cargo || null,
+          emblema: nivel,
+          observacoes: observacao || null,
+          foto_url: fotoUrl || null
+        }),
+      });
+
+      const data = await response.json();
+
+      // Se a API avisar que deu algum erro, extraímos a mensagem real para mostrar na tela
+      if (!response.ok) {
+        let mensagemErro = "Erro desconhecido ao cadastrar.";
+        if (data.error && data.error.message) {
+          mensagemErro = data.error.message;
+        } else if (typeof data.error === 'string') {
+          mensagemErro = data.error;
+        } else {
+          // Converte o objeto de erro para texto, evitando o erro visual "{}"
+          mensagemErro = JSON.stringify(data.error);
+        }
+        throw new Error(mensagemErro);
+      }
 
       alert("Funcionário cadastrado com sucesso!");
-      setForm({ email: "", senha: "", nome_completo: "", cpf: "", whatsapp: "", data_nascimento: "", chave_pix: "", cargo: "funcionario", emblema: "Bronze", observacoes: "", foto_url: "" });
+
+      // Limpar formulário após o sucesso
+      setEmail("");
+      setSenha("");
+      setNome("");
+      setCpf("");
+      setDataNascimento("");
+      setTelefone("");
+      setFotoUrl("");
+      setCargo("");
+      setNivel("Bronze");
+      setObservacao("");
+
     } catch (error) {
-      alert("Erro ao cadastrar: " + error.message);
+      alert("Falha no cadastro: " + error.message);
+      console.error("Erro completo:", error);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
-      <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-6">
-        <button onClick={() => router.push("/admin")} className="text-blue-600 font-bold mb-6 hover:underline">
-          &larr; Voltar para o Menu
-        </button>
-        <h2 className="text-2xl font-bold mb-6 text-gray-800">Cadastrar Novo Funcionário</h2>
-        
-        <form onSubmit={handleSalvar} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="col-span-full border-b pb-2"><h3 className="font-bold text-gray-600">Acesso ao App</h3></div>
-          <input type="email" name="email" value={form.email} onChange={handleChange} placeholder="E-mail de Login" required className="border p-2 rounded" />
-          <input type="password" name="senha" value={form.senha} onChange={handleChange} placeholder="Senha Inicial" required className="border p-2 rounded" />
-
-          <div className="col-span-full mt-4 border-b pb-2"><h3 className="font-bold text-gray-600">Dados Pessoais</h3></div>
-          <input type="text" name="nome_completo" value={form.nome_completo} onChange={handleChange} placeholder="Nome Completo" required className="border p-2 rounded" />
-          <input type="text" name="cpf" value={form.cpf} onChange={handleChange} placeholder="CPF" required className="border p-2 rounded" />
-          <input type="date" name="data_nascimento" value={form.data_nascimento} onChange={handleChange} required className="border p-2 rounded text-gray-600" />
-          <input type="text" name="whatsapp" value={form.whatsapp} onChange={handleChange} placeholder="WhatsApp" required className="border p-2 rounded" />
-
-          <div className="col-span-full mt-4 border-b pb-2"><h3 className="font-bold text-gray-600">Empresa</h3></div>
-          <input type="text" name="chave_pix" value={form.chave_pix} onChange={handleChange} placeholder="Chave PIX" className="border p-2 rounded" />
-          <input type="text" name="foto_url" value={form.foto_url} onChange={handleChange} placeholder="URL da Foto (Opcional)" className="border p-2 rounded" />
-          
-          <select name="cargo" value={form.cargo} onChange={handleChange} className="border p-2 rounded bg-white">
-            <option value="funcionario">Funcionário Comum</option>
-            <option value="admin">Administrador</option>
-          </select>
-          <select name="emblema" value={form.emblema} onChange={handleChange} className="border p-2 rounded bg-white">
-            <option value="Bronze">Nível: Bronze</option>
-            <option value="Prata">Nível: Prata</option>
-            <option value="Ouro">Nível: Ouro</option>
-          </select>
-          <textarea name="observacoes" value={form.observacoes} onChange={handleChange} placeholder="Observações..." className="border p-2 rounded col-span-full h-24"></textarea>
-
-          <button type="submit" disabled={loading} className="col-span-full mt-4 bg-blue-600 text-white font-bold py-3 rounded hover:bg-blue-700">
-            {loading ? "Cadastrando..." : "Salvar Funcionário"}
-          </button>
-        </form>
+    <div className="p-6 max-w-4xl mx-auto">
+      <div className="mb-6">
+        <Link 
+          href="/admin" 
+          className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-sm font-medium"
+        >
+          ← Voltar para o Menu
+        </Link>
       </div>
+
+      <h1 className="text-3xl font-bold mb-8 text-gray-800">Cadastrar Novo Funcionário</h1>
+
+      <form onSubmit={handleCadastro} className="space-y-8 bg-white p-6 rounded-lg shadow">
+        
+        {/* Seção 1: Acesso ao App */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4 text-blue-600 border-b pb-2">Acesso ao App</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              type="email"
+              placeholder="Email do funcionário"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="border border-gray-300 p-2 w-full rounded focus:outline-blue-500"
+            />
+            <input
+              type="password"
+              placeholder="Senha (mínimo 6 caracteres)"
+              value={senha}
+              onChange={(e) => setSenha(e.target.value)}
+              required
+              minLength="6"
+              className="border border-gray-300 p-2 w-full rounded focus:outline-blue-500"
+            />
+          </div>
+        </div>
+
+        {/* Seção 2: Dados Pessoais */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4 text-blue-600 border-b pb-2">Dados Pessoais</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              type="text"
+              placeholder="Nome Completo"
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              required
+              className="border border-gray-300 p-2 w-full rounded focus:outline-blue-500"
+            />
+            <input
+              type="text"
+              placeholder="CPF (Apenas números)"
+              value={cpf}
+              onChange={(e) => setCpf(e.target.value)}
+              required
+              className="border border-gray-300 p-2 w-full rounded focus:outline-blue-500"
+            />
+            <input
+              type="date"
+              placeholder="Data de Nascimento"
+              value={dataNascimento}
+              onChange={(e) => setDataNascimento(e.target.value)}
+              className="border border-gray-300 p-2 w-full rounded focus:outline-blue-500 text-gray-600"
+            />
+            <input
+              type="text"
+              placeholder="WhatsApp / Telefone"
+              value={telefone}
+              onChange={(e) => setTelefone(e.target.value)}
+              className="border border-gray-300 p-2 w-full rounded focus:outline-blue-500"
+            />
+          </div>
+        </div>
+
+        {/* Seção 3: Dados Profissionais */}
+        <div>
+          <h2 className="text-xl font-semibold mb-4 text-blue-600 border-b pb-2">Dados Profissionais (WADjet)</h2>
+          <div className="grid grid-cols-1 gap-4">
+            <input
+              type="text"
+              placeholder="URL da Foto (Opcional)"
+              value={fotoUrl}
+              onChange={(e) => setFotoUrl(e.target.value)}
+              className="border border-gray-300 p-2 w-full rounded focus:outline-blue-500"
+            />
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="text"
+                placeholder="Cargo (Ex: Garçom, Segurança)"
+                value={cargo}
+                onChange={(e) => setCargo(e.target.value)}
+                className="border border-gray-300 p-2 w-full rounded focus:outline-blue-500"
+              />
+              
+              <select
+                value={nivel}
+                onChange={(e) => setNivel(e.target.value)}
+                className="border border-gray-300 p-2 w-full rounded focus:outline-blue-500 bg-white"
+              >
+                <option value="Bronze">Bronze (Novato)</option>
+                <option value="Prata">Prata (Intermediário)</option>
+                <option value="Ouro">Ouro (Experiente)</option>
+                <option value="Diamante">Diamante (Elite)</option>
+              </select>
+            </div>
+
+            <textarea
+              placeholder="Observações sobre o funcionário..."
+              value={observacao}
+              onChange={(e) => setObservacao(e.target.value)}
+              rows="3"
+              className="border border-gray-300 p-2 w-full rounded focus:outline-blue-500 resize-none"
+            />
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded hover:bg-blue-700 transition disabled:bg-blue-400 disabled:cursor-not-allowed"
+        >
+          {loading ? "Cadastrando..." : "Cadastrar Funcionário"}
+        </button>
+      </form>
     </div>
   );
 }

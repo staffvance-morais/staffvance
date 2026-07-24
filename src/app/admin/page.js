@@ -1,10 +1,9 @@
 "use client";
-
-import { useState, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
 
-// Inicializa a conexão com o Supabase
+// Inicializa o Supabase para o botão de sair funcionar
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -12,153 +11,62 @@ const supabase = createClient(
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [eventos, setEventos] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  // Busca os eventos assim que a página carrega
-  useEffect(() => {
-    async function carregarEventos() {
-      try {
-        const { data, error } = await supabase
-          .from("eventos")
-          .select("*")
-          .order("created_at", { ascending: false }) // Traz os mais novos primeiro
-          .limit(5);
-
-        if (error) throw error;
-        
-        // Essa linha vai mostrar os dados no Console (F12) para você ver os nomes das colunas
-        console.log("MEUS EVENTOS DO BANCO:", data); 
-        
-        setEventos(data || []);
-      } catch (error) {
-        console.error("Erro ao buscar eventos:", error.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    carregarEventos();
-  }, []);
-
-  // Função para sair da conta
-  const handleLogout = async () => {
+  const handleSair = async () => {
     await supabase.auth.signOut();
-    router.push("/"); // Volta para a tela de login
+    router.push("/");
   };
 
   return (
-    <main className="min-h-screen flex flex-col items-center p-4 bg-gray-100">
-      <div className="w-full max-w-md bg-white p-6 border border-gray-300 shadow-md">
+    <div className="min-h-screen bg-gray-100 p-6 flex flex-col items-center pt-10">
+      <div className="w-full max-w-md bg-white p-8 rounded shadow-sm">
         
         {/* Cabeçalho */}
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">Painel da<br/>Administração</h1>
-            <p className="text-sm text-gray-600 mt-1">Gestão centralizada do StaffVance</p>
+            <h1 className="text-3xl font-bold text-gray-900 leading-tight">Painel da<br/>Administração</h1>
+            <p className="text-gray-700 mt-4 text-sm">Gestão centralizada do Staffvance</p>
           </div>
           <button 
-            onClick={handleLogout}
-            className="text-sm border border-gray-400 p-1 hover:bg-gray-100"
+            onClick={handleSair}
+            className="border border-gray-400 text-gray-800 px-3 py-1 text-xs hover:bg-gray-100 transition text-center"
           >
             Sair do<br/>Sistema
           </button>
         </div>
 
-        {/* Botões de Ação com as rotas corrigidas */}
-        <div className="flex flex-col gap-2 mb-8">
-          <button 
-            onClick={() => router.push('/admin/funcionarios')} 
-            className="w-full border-2 border-black p-2 font-medium hover:bg-gray-50 flex justify-center gap-2"
-          >
-            👥 Cadastrar Equipe
-          </button>
+        {/* Menu de Botões */}
+        <div className="flex flex-col border border-gray-400 mt-2">
           
-          <button 
-            onClick={() => router.push('/admin/clientes')} 
-            className="w-full border-2 border-black p-2 font-medium hover:bg-gray-50 flex justify-center gap-2"
-          >
-            🏢 Cadastrar Clientes
-          </button>
-          
-          <button 
-            onClick={() => router.push('/admin/eventos')} 
-            className="w-full border-2 border-black p-2 font-medium hover:bg-gray-50 flex justify-center gap-2"
-          >
-            📅 Criar Eventos
-          </button>
-          
-          <button 
-            onClick={() => router.push('/admin/escalas')} 
-            className="w-full border-2 border-black p-2 font-medium hover:bg-gray-50 flex justify-center gap-2"
-          >
-            📋 Montar Escalas
-          </button>
-        </div>
+          <Link href="/admin/funcionarios" className="border-b border-gray-400 py-3 text-center hover:bg-gray-50 transition">
+            <span className="block text-purple-900 text-lg mb-1">👥</span>
+            <span className="text-purple-900 underline text-[15px]">Cadastrar Equipe</span>
+          </Link>
 
-        {/* Seção de Eventos com Mapa */}
-        <div className="border-t-2 border-gray-300 pt-4">
-          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            📍 Próximos Eventos
-          </h2>
+          <Link href="/admin/clientes" className="border-b border-gray-400 py-3 text-center hover:bg-gray-50 transition">
+            <span className="block text-purple-900 text-lg mb-1">🏢</span>
+            <span className="text-purple-900 underline text-[15px]">Cadastrar Clientes</span>
+          </Link>
 
-          {loading ? (
-            <p className="text-center text-gray-500">Carregando eventos...</p>
-          ) : eventos.length === 0 ? (
-            <p className="text-center text-gray-500">Nenhum evento programado.</p>
-          ) : (
-            <div className="flex flex-col gap-6">
-              {eventos.map((evento, index) => {
-                
-                // NOME DO EVENTO
-                const nomeDoEvento = evento.titulo || "Evento sem nome";
-                
-                // DATA DO EVENTO FORMATADA PARA O BRASIL
-                const dataDoEvento = evento.data_inicio 
-                  ? new Date(evento.data_inicio).toLocaleString('pt-BR') 
-                  : "Não informada";
-                  
-                // LOCAL DO EVENTO
-                // Se o seu mapa ainda não aparecer, veja no Console qual é o nome exato 
-                // da coluna de endereço e troque 'endereco' aqui embaixo:
-                const localDoEvento = evento.endereco || evento.local || evento.endereco_completo || "";
+          <Link href="/admin/eventos" className="border-b border-gray-400 py-3 text-center hover:bg-gray-50 transition">
+            <span className="block text-purple-900 text-lg mb-1">📅</span>
+            <span className="text-purple-900 underline text-[15px]">Criar Eventos</span>
+          </Link>
 
-                return (
-                  <div key={index} className="border border-gray-300 rounded-md overflow-hidden bg-gray-50">
-                    <div className="p-3 border-b border-gray-300">
-                      <h3 className="font-bold text-lg text-gray-800">{nomeDoEvento}</h3>
-                      <p className="text-sm text-gray-600">
-                        <strong>Início:</strong> {dataDoEvento}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        <strong>Local:</strong> {localDoEvento || "Não informado"}
-                      </p>
-                    </div>
-                    
-                    {/* Mapa do Google embutido dinamicamente */}
-                    {localDoEvento ? (
-                      <iframe
-                        width="100%"
-                        height="150"
-                        style={{ border: 0 }}
-                        loading="lazy"
-                        allowFullScreen
-                        referrerPolicy="no-referrer-when-downgrade"
-                        src={`https://www.google.com/maps?q=${encodeURIComponent(localDoEvento)}&output=embed`}
-                      ></iframe>
-                    ) : (
-                      <div className="h-[150px] flex items-center justify-center bg-gray-200 text-gray-500 text-sm">
-                        Mapa indisponível (Local não preenchido)
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <Link href="/admin/escalas" className="border-b border-gray-400 py-3 text-center hover:bg-gray-50 transition">
+            <span className="block text-purple-900 text-lg mb-1">📋</span>
+            <span className="text-purple-900 underline text-[15px]">Montar Escalas</span>
+          </Link>
+
+          {/* NOVO BOTÃO: Gestão Financeira */}
+          <Link href="/admin/financeiro" className="py-3 text-center hover:bg-gray-50 transition bg-purple-50">
+            <span className="block text-purple-900 text-lg mb-1">💰</span>
+            <span className="text-purple-900 underline text-[15px] font-bold">Gestão Financeira</span>
+          </Link>
+
         </div>
 
       </div>
-    </main>
+    </div>
   );
 }
