@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
+import { Mail, Lock, ArrowRight } from "lucide-react";
 
 // Inicializando o cliente Supabase
 const supabase = createClient(
@@ -13,21 +14,21 @@ const supabase = createClient(
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false); 
   const router = useRouter();
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setLoading(true); 
 
     try {
-      // 1. Tenta fazer a autenticação (Verificar credenciais no cofre)
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password,
+        email,
+        password,
       });
 
       if (authError) throw authError;
 
-      // 2. Busca o perfil do usuário logado na tabela "perfis" sem usar o .single()
       const { data: perfilData, error: perfilError } = await supabase
         .from("perfis")
         .select("role")
@@ -35,12 +36,10 @@ export default function Login() {
 
       if (perfilError) throw perfilError;
 
-      // Se a tabela estiver vazia, bloqueada ou o perfil não existir, ele avisa sem quebrar
       if (!perfilData || perfilData.length === 0) {
-        throw new Error("Login aprovado, mas o perfil não foi encontrado na tabela.");
+        throw new Error("Login aprovado, mas o perfil não foi encontrado.");
       }
 
-      // 3. Redirecionamento de Página baseado no Cargo (pegando o 1º item da lista)
       if (perfilData[0].role === "admin") {
         router.push("/admin");
       } else {
@@ -50,41 +49,83 @@ export default function Login() {
     } catch (error) {
       console.error(error);
       alert("Erro ao entrar: " + error.message);
+      setLoading(false); 
     }
   };
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-100">
-      <div className="w-full max-w-md bg-white p-8 border border-gray-300 shadow-md">
-        <h1 className="text-3xl font-bold mb-6 text-gray-800 border-b-2 border-gray-300 pb-2">
-          Entrar no StaffVance
-        </h1>
+    <div style={{ height: '100vh', width: '100%', backgroundColor: '#18181b', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif', position: 'relative', overflow: 'hidden' }}>
+      
+      {/* CAIXA DE LOGIN: Mais estreita (21rem), sem bordas arredondadas e sem sombras */}
+      <div style={{ width: '90%', maxWidth: '21rem', backgroundColor: '#222222', border: '1px solid #4a4a4a', padding: '3rem 2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', borderRadius: '0', boxShadow: 'none', boxSizing: 'border-box' }}>
         
-        <form onSubmit={handleLogin} className="flex flex-col gap-4">
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-gray-400 p-2"
-            placeholder="E-mail"
-            required
-          />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-gray-400 p-2"
-            placeholder="Senha"
-            required
-          />
-          <button 
-            type="submit" 
-            className="w-full bg-gray-200 border border-gray-400 p-2 hover:bg-gray-300 transition-colors mt-2"
+        {/* LOGO */}
+        <img 
+          src="/logo_full_gray.svg" 
+          alt="Wadjet Segurança" 
+          style={{ width: '11rem', marginBottom: '2.5rem', opacity: '0.7', objectFit: 'contain' }} 
+        />
+
+        {/* FORMULÁRIO */}
+        <form onSubmit={handleLogin} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.25rem', boxSizing: 'border-box' }}>
+          
+          {/* E-MAIL */}
+          <div style={{ position: 'relative', width: '100%' }}>
+            {/* Ícone com stroke mais grosso e cor mais clara */}
+            <Mail style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#a3a3a3', width: '1.25rem', height: '1.25rem' }} strokeWidth={2.5} />
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="E-mail"
+              required
+              style={{ width: '100%', backgroundColor: '#333333', border: '1px solid #5c5c5c', color: '#ffffff', padding: '0.875rem 1rem 0.875rem 3.25rem', borderRadius: '0', fontSize: '1rem', fontWeight: '400', outline: 'none', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          {/* SENHA */}
+          <div style={{ position: 'relative', width: '100%' }}>
+             {/* Ícone com stroke mais grosso e cor mais clara */}
+            <Lock style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#a3a3a3', width: '1.25rem', height: '1.25rem' }} strokeWidth={2.5} />
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Senha"
+              required
+              style={{ width: '100%', backgroundColor: '#333333', border: '1px solid #5c5c5c', color: '#ffffff', padding: '0.875rem 1rem 0.875rem 3.25rem', borderRadius: '0', fontSize: '1rem', fontWeight: '400', outline: 'none', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          {/* BOTÃO ENTRAR: Sem contorno, mesma largura dos inputs, quadrado */}
+          <button
+            type="submit"
+            disabled={loading}
+            style={{ width: '100%', backgroundColor: '#1ea853', color: '#ffffff', border: 'none', padding: '0.875rem', fontSize: '1.125rem', fontWeight: '600', borderRadius: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', cursor: 'pointer', marginTop: '0.25rem', boxSizing: 'border-box' }}
           >
-            Entrando...
+            {loading ? (
+              "Entrando..."
+            ) : (
+              <>
+                {/* Seta branca e mais grossa */}
+                <ArrowRight style={{ color: '#ffffff', width: '1.5rem', height: '1.5rem' }} strokeWidth={3} />
+                Entrar
+              </>
+            )}
           </button>
         </form>
+
+        {/* TEXTO DE AJUDA: Quebra de linha adicionada para bater com o design */}
+        <div style={{ marginTop: '2rem', color: '#737373', fontSize: '0.875rem', textAlign: 'center', lineHeight: '1.5' }}>
+          Primeiro acesso?<br />Contate o administrador.
+        </div>
       </div>
-    </main>
+
+      {/* DIREITOS RESERVADOS: Quebra de linha adicionada */}
+      <div style={{ position: 'absolute', bottom: '2rem', color: '#525252', fontSize: '0.875rem', textAlign: 'center', width: '100%', lineHeight: '1.5' }}>
+        © 2026 Seriguela Solutions.<br />Todos os direitos reservados.
+      </div>
+
+    </div>
   );
 }

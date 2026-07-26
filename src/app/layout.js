@@ -1,16 +1,17 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "StaffVance",
-  description: "Painel de Gestão e Escala",
+  title: "StaffVance - Wadjet",
+  description: "Sistema de Gestão e Segurança",
+  icons: {
+    icon: "/logo_full_gray.svg",
+  },
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="pt-br">
-      <body className="antialiased">
-        {children}
-      </body>
+    <html lang="pt-BR">
+      <body>{children}</body>
     </html>
   );
 }
