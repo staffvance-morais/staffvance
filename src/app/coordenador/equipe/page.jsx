@@ -10,19 +10,20 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-export default function ListaEquipe() {
+export default function EquipeCoordenador() {
   const router = useRouter();
   const [funcionarios, setFuncionarios] = useState([]);
   const [busca, setBusca] = useState("");
   const [selecionados, setSelecionados] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Busca os funcionários no Supabase ao carregar a página
+  // Busca apenas os funcionários com o cargo 'staff' no Supabase ao carregar a página
   useEffect(() => {
     async function fetchEquipe() {
       const { data, error } = await supabase
-        .from("perfis") // Certifique-se de que o nome da tabela no Supabase é 'perfis'
+        .from("perfis")
         .select("*")
+        .eq("role", "staff") // Filtra para trazer apenas os funcionários comuns
         .order("nome_completo", { ascending: true });
 
       if (error) {
@@ -137,7 +138,7 @@ export default function ListaEquipe() {
         
         {/* Botão que leva para a tela de Cadastrar Novo Funcionário */}
         <button 
-          onClick={() => router.push("/admin/funcionarios/novo")} 
+          onClick={() => router.push("/coordenador/funcionarios/novo")} 
           className="w-full bg-[#1e50cf] hover:bg-[#163a99] text-white font-medium text-lg py-4 flex items-center justify-center gap-2 rounded-sm transition-colors"
         >
           <Plus size={24} strokeWidth={2.5} />
@@ -156,7 +157,6 @@ export default function ListaEquipe() {
         {/* Barra de Navegação do App */}
         <div className="w-full border border-[#333] p-3 mt-1 flex justify-between items-center bg-[#1a1a1a] rounded-sm">
           <div className="w-9 h-9 flex items-center justify-center opacity-40 grayscale">
-             {/* Logo provisória da Wadjet */}
              <img src="/icon.png" alt="Logo" className="h-full object-contain" />
           </div>
           

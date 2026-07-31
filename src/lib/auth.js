@@ -1,6 +1,5 @@
 import { supabase } from '@/lib/supabase';
 
-// 1. Função de Login Inteligente
 export async function loginStaff(email, password) {
   const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
     email,
@@ -11,7 +10,6 @@ export async function loginStaff(email, password) {
     return { success: false, error: authError.message };
   }
 
-  // Busca qual é o cargo dessa pessoa na tabela perfis
   const { data: perfilData, error: perfilError } = await supabase
     .from('perfis')
     .select('role')
@@ -29,7 +27,6 @@ export async function loginStaff(email, password) {
   };
 }
 
-// 2. Função de Cadastro Completo (Atualizada para evitar confirmação de e-mail)
 export async function signUpStaff(email, password, userData) {
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -43,7 +40,6 @@ export async function signUpStaff(email, password, userData) {
         chave_pix: userData.chave_pix,
         foto_url: userData.foto_url,
       },
-      // Este comando ajuda a não forçar o redirecionamento de e-mail de confirmação
       emailRedirectTo: undefined,
     },
   });
@@ -55,7 +51,6 @@ export async function signUpStaff(email, password, userData) {
   return { success: true, data };
 }
 
-// 3. Função de Sair do Sistema (Logout)
 export async function logoutStaff() {
   const { error } = await supabase.auth.signOut();
   if (error) {

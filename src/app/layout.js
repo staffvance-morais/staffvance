@@ -1,11 +1,8 @@
-import "./globals.css";
+import "./globals.css"; // Essa linha faz a mágica do Tailwind funcionar
 
 export const metadata = {
-  title: "StaffVance - Wadjet",
-  description: "Sistema de Gestão e Segurança",
-  icons: {
-    icon: "/logo_full_gray.svg",
-  },
+  title: "StaffVance",
+  description: "Wadjet Segurança",
 };
 
 export default function RootLayout({ children }) {
