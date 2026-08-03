@@ -24,7 +24,7 @@ import {
   DollarSign
 } from "lucide-react";
 
-export default function CadastrarFuncionario() {
+export default function CadastrarFuncionarioCoordenador() {
   const router = useRouter();
   const fileInputRef = useRef(null);
 
@@ -66,7 +66,6 @@ export default function CadastrarFuncionario() {
   const handleFotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Opcional: Aqui você pode colocar uma validação para checar se file.size < 2MB no futuro
       const imageUrl = URL.createObjectURL(file);
       setFotoUrl(imageUrl);
     }
@@ -111,7 +110,8 @@ export default function CadastrarFuncionario() {
       }
 
       alert("Funcionário cadastrado com sucesso!");
-      router.push("/admin/funcionarios");
+      // REDIRECIONA PARA A PÁGINA DA LANA
+      router.push("/coordenador/equipe");
 
     } catch (error) {
       alert("Falha no cadastro: " + error.message);
@@ -143,14 +143,12 @@ export default function CadastrarFuncionario() {
         <div className="mb-8">
           <div className="mb-3">
             <h2 className="text-gray-200 font-bold text-lg">Foto de Perfil</h2>
-            {/* Aviso de tamanho inserido aqui */}
             <p className="text-xs text-gray-500 mt-1">
               Recomendado: <strong>500x500px</strong> (proporção quadrada 1:1). Máx: <strong>2MB</strong>.
             </p>
           </div>
           
           <div className="border border-[#333] p-3 flex justify-between bg-[#1a1a1a]">
-            {/* Quadrado da foto com texto "Sem foto" quando vazio */}
             <div className="w-32 h-32 bg-white flex-shrink-0 flex items-center justify-center text-center p-2 overflow-hidden">
               {fotoUrl ? (
                 <img src={fotoUrl} alt="Perfil" className="w-full h-full object-cover" />
@@ -178,7 +176,6 @@ export default function CadastrarFuncionario() {
                 <ImagePlus size={22} className="text-white" strokeWidth={1.5} />
               </button>
               
-              {/* Restringido para aceitar apenas formatos de imagem comuns */}
               <input 
                 type="file" 
                 ref={fileInputRef} 
@@ -410,7 +407,8 @@ export default function CadastrarFuncionario() {
             
             <button 
               type="button"
-              onClick={() => router.push("/admin/funcionarios")}
+              // REDIRECIONA PARA A PÁGINA DA LANA NO CANCELAMENTO
+              onClick={() => router.push("/coordenador/equipe")}
               className="w-full bg-[#2a2a2a] border border-[#333] hover:bg-[#333] text-gray-300 font-medium text-lg py-4 flex items-center justify-center transition-colors"
             >
               Cancelar
@@ -428,7 +426,8 @@ export default function CadastrarFuncionario() {
           </div>
           
           <button 
-            onClick={() => router.push("/admin")}
+            // REDIRECIONA PARA O MENU INICIAL DO COORDENADOR
+            onClick={() => router.push("/coordenador")}
             className="p-2 border border-[#444] bg-transparent hover:bg-[#2a2a2a] transition-colors cursor-pointer"
           >
             <Menu size={26} className="text-gray-400" strokeWidth={1.5} />

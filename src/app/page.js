@@ -1,9 +1,11 @@
 "use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { Mail, Lock, ArrowRight } from "lucide-react";
 
+// Configuração do Supabase usando as variáveis de ambiente
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -21,6 +23,7 @@ export default function Login() {
     setLoading(true);
     setErro("");
 
+    // Autenticação com o Supabase
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password: senha,
@@ -32,6 +35,7 @@ export default function Login() {
       return;
     }
 
+    // Busca o cargo (role) do usuário na tabela 'perfis'
     const userId = data.user.id;
     const { data: perfil } = await supabase
       .from("perfis")
@@ -39,17 +43,17 @@ export default function Login() {
       .eq("id", userId)
       .single();
 
-    // Corta espaços em branco e joga tudo para minúsculo
+    // Corta espaços em branco e joga tudo para minúsculo para evitar erros de digitação no banco
     const userRole = perfil?.role?.toLowerCase().trim() || "";
     
-    // Imprime no console
+    // Imprime no console para você debugar se precisar
     console.log("O cargo exato que veio do banco é:", `"${userRole}"`); 
 
-  
     // Redirecionamento baseado no cargo do usuário
     if (userRole === "admin" || userRole === "owner") {
       router.push("/admin"); 
     } else if (userRole === "coordenador") {
+      // Direciona a Lana para a tela inicial (Em desenvolvimento)
       router.push("/coordenador"); 
     } else {
       router.push("/funcionarios"); 
@@ -59,13 +63,20 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-[#141414] flex flex-col items-center justify-center relative font-sans">
       <div className="bg-[#1e1e1e] p-8 rounded-md border border-[#2a2a2a] w-full max-w-sm flex flex-col items-center shadow-2xl">
+        
+        {/* Logo */}
         <div className="mb-8 w-48 flex justify-center">
           <img src="/logo_full_gray.svg" alt="Wadjet Segurança" className="w-full h-auto object-contain opacity-80" />
         </div>
 
+        {/* Formulário */}
         <form onSubmit={handleLogin} className="w-full flex flex-col gap-4">
+          
+          {/* Input E-mail */}
           <div className="relative flex items-center">
-            <div className="absolute left-4 text-gray-500"><Mail size={18} strokeWidth={2} /></div>
+            <div className="absolute left-4 text-gray-500">
+              <Mail size={18} strokeWidth={2} />
+            </div>
             <input
               type="email"
               placeholder="E-mail"
@@ -76,8 +87,11 @@ export default function Login() {
             />
           </div>
 
+          {/* Input Senha */}
           <div className="relative flex items-center">
-            <div className="absolute left-4 text-gray-500"><Lock size={18} strokeWidth={2} /></div>
+            <div className="absolute left-4 text-gray-500">
+              <Lock size={18} strokeWidth={2} />
+            </div>
             <input
               type="password"
               placeholder="Senha"
@@ -88,8 +102,10 @@ export default function Login() {
             />
           </div>
 
+          {/* Mensagem de Erro */}
           {erro && <p className="text-red-500 text-sm text-center font-semibold mt-1">{erro}</p>}
 
+          {/* Botão Entrar */}
           <button
             type="submit"
             disabled={loading}
@@ -99,12 +115,14 @@ export default function Login() {
           </button>
         </form>
 
+        {/* Links auxiliares */}
         <div className="mt-8 text-center text-xs text-gray-500 flex flex-col gap-1">
           <p>Primeiro acesso?</p>
           <p>Contate o administrador.</p>
         </div>
       </div>
 
+      {/* Rodapé */}
       <div className="absolute bottom-6 text-center text-xs text-[#555] flex flex-col gap-1">
         <p>© 2026 Seriguela Solutions.</p>
         <p>Todos os direitos reservados.</p>

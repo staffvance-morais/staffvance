@@ -136,9 +136,9 @@ export default function EquipeCoordenador() {
       {/* ===== BARRA INFERIOR FIXA ===== */}
       <div className="fixed bottom-0 left-0 w-full bg-[#141414] p-4 flex flex-col gap-2 border-t border-[#222]">
         
-        {/* Botão que leva para a tela de Cadastrar Novo Funcionário */}
+        {/* Botão que leva para a tela de Cadastrar Novo Funcionário (CORRIGIDO AQUI) */}
         <button 
-          onClick={() => router.push("/coordenador/funcionarios/novo")} 
+          onClick={() => router.push("/coordenador/equipe/novo")} 
           className="w-full bg-[#1e50cf] hover:bg-[#163a99] text-white font-medium text-lg py-4 flex items-center justify-center gap-2 rounded-sm transition-colors"
         >
           <Plus size={24} strokeWidth={2.5} />
