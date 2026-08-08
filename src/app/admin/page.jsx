@@ -28,7 +28,7 @@ export default function AdminPage() {
         {/* Topo: Copyright e Botão Fechar */}
         <div className="flex justify-between items-start mb-8">
           <div className="text-xs text-[#555] font-medium leading-relaxed mt-2">
-            © 2026 Seriguela Solutions.<br/>
+            © 2026 Sunset Field Solutions.<br/>
             Todos os direitos reservados.
           </div>
           <button 
@@ -43,37 +43,53 @@ export default function AdminPage() {
         <div className="flex flex-col gap-2 mb-8">
           <button 
             onClick={() => setIsMenuOpen(false)}
-            className="border border-[#333] bg-[#1a1a1a] flex items-center gap-4 p-4 hover:bg-[#222] transition-colors text-left cursor-pointer"
+            className="border border-[#333] bg-[#1a1a1a] flex items-center gap-4 p-4 hover:bg-[#222] transition-colors text-left cursor-pointer w-full"
           >
             <Home size={22} className="text-gray-400" strokeWidth={1.5} />
             <span className="text-gray-200 text-lg">Página inicial</span>
           </button>
 
-          {/* Botão Equipe configurado com a rota correta do Morais */}
+          {/* Botão Equipe configurado com a rota */}
           <button 
              onClick={() => router.push("/admin/funcionarios")}
-            className="border border-[#333] bg-[#1a1a1a] flex items-center gap-4 p-4 hover:bg-[#222] transition-colors text-left cursor-pointer"
+            className="border border-[#333] bg-[#1a1a1a] flex items-center gap-4 p-4 hover:bg-[#222] transition-colors text-left cursor-pointer w-full"
           >
             <Contact2 size={22} className="text-gray-400" strokeWidth={1.5} />
             <span className="text-gray-200 text-lg">Equipe</span>
           </button>
 
-          <button className="border border-[#333] bg-[#1a1a1a] flex items-center gap-4 p-4 hover:bg-[#222] transition-colors text-left cursor-pointer">
+          {/* O SEU CLIQUE DE CLIENTES FOI ADICIONADO AQUI */}
+          <button 
+            onClick={() => router.push("/admin/clientes")}
+            className="border border-[#333] bg-[#1a1a1a] flex items-center gap-4 p-4 hover:bg-[#222] transition-colors text-left cursor-pointer w-full"
+          >
             <Handshake size={22} className="text-gray-400" strokeWidth={1.5} />
             <span className="text-gray-200 text-lg">Clientes</span>
           </button>
 
-          <button className="border border-[#333] bg-[#1a1a1a] flex items-center gap-4 p-4 hover:bg-[#222] transition-colors text-left cursor-pointer">
+          {/* O CLIQUE DE EVENTOS FOI ADICIONADO AQUI */}
+          <button 
+            onClick={() => router.push("/admin/eventos")}
+            className="border border-[#333] bg-[#1a1a1a] flex items-center gap-4 p-4 hover:bg-[#222] transition-colors text-left cursor-pointer w-full"
+          >
             <CopyPlus size={22} className="text-gray-400" strokeWidth={1.5} />
             <span className="text-gray-200 text-lg">Eventos</span>
           </button>
 
-          <button className="border border-[#333] bg-[#1a1a1a] flex items-center gap-4 p-4 hover:bg-[#222] transition-colors text-left cursor-pointer">
+          {/* O CLIQUE DE ESCALAS FOI ADICIONADO AQUI */}
+          <button 
+            onClick={() => router.push("/admin/escalas")}
+            className="border border-[#333] bg-[#1a1a1a] flex items-center gap-4 p-4 hover:bg-[#222] transition-colors text-left cursor-pointer w-full"
+          >
             <CalendarClock size={22} className="text-gray-400" strokeWidth={1.5} />
             <span className="text-gray-200 text-lg">Escalas</span>
           </button>
 
-          <button className="border border-[#333] bg-[#1a1a1a] flex items-center gap-4 p-4 hover:bg-[#222] transition-colors text-left cursor-pointer">
+          {/* O CLIQUE DO FINANCEIRO FOI ADICIONADO AQUI */}
+          <button 
+            onClick={() => router.push("/admin/financeiro")}
+            className="border border-[#333] bg-[#1a1a1a] flex items-center gap-4 p-4 hover:bg-[#222] transition-colors text-left cursor-pointer w-full"
+          >
             <Wallet size={22} className="text-gray-400" strokeWidth={1.5} />
             <span className="text-gray-200 text-lg">Financeiro</span>
           </button>
