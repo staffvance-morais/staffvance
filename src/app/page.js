@@ -57,7 +57,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#141414] flex flex-col items-center justify-center relative font-sans">
+    <div className="min-h-screen bg-neutral-900 flex flex-col items-center justify-center relative font-sans">
       
       <div className="w-full max-w-sm flex flex-col items-center relative">
         
@@ -120,21 +120,25 @@ export default function Login() {
               {loading ? "Entrando..." : "Entrar"}
             </button>
             
-            {/* Esqueci a senha */}
-            <div className="text-center mt-[-4px]">
-              <a href="#" className="text-[#777] text-xs underline hover:text-white transition-colors">
+            {/* Esqueci a senha - AQUI FOI A CORREÇÃO */}
+            <div className="text-center">
+              <button 
+                type="button" 
+                onClick={() => router.push("/esqueci-senha")}
+                className="text-[#777] text-xs underline hover:text-white transition-colors cursor-pointer bg-transparent border-none p-0"
+              >
                 Esqueci a senha
-              </a>
+              </button>
             </div>
 
             {/* Divisor */}
-            <div className="w-full h-[1px] bg-[#2a2a2a] my-2"></div>
+            <div className="w-full h-0.5 bg-neutral-600 my-1"></div>
 
             {/* Botão Cadastre-se */}
             <button
               type="button"
               onClick={() => router.push("/cadastro")}
-              className="w-full bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-bold text-sm py-3 rounded-sm transition-colors"
+              className="w-full bg-blue-700 text-white font-semibold text-lg py-2 rounded-none transition-colors border-4 border-blue-600 hover:bg-blue-600 hover:border-blue-500 focus:bg-blue-600 focus:border-blue-500"
             >
               Cadastre-se
             </button>
@@ -142,9 +146,9 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Rodapé */}
-      <div className="absolute bottom-6 text-center text-[10px] text-[#555] flex flex-col gap-1">
-        <p>© 2026 Seriguela Solutions.</p>
+      {/* Rodapé - ATUALIZADO */}
+      <div className="absolute bottom-6 text-center text-sm text-neutral-700 flex flex-col gap-1">
+        <p>© 2026 Sunset Field Solutions.</p>
         <p>Todos os direitos reservados.</p>
       </div>
     </div>
