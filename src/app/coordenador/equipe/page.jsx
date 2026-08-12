@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { Search, Info, Plus, Filter, ChevronUp, Menu, Users } from "lucide-react";
+import { Search, Info, Plus, Filter, ChevronUp, Menu, Users, User } from "lucide-react"; // Importei o ícone User aqui
 
 // Configuração do Supabase
 const supabase = createClient(
@@ -12,24 +12,25 @@ const supabase = createClient(
 
 export default function EquipeCoordenador() {
   const router = useRouter();
-  const [funcionarios, setFuncionarios] = useState([]);
+  
+  const [staffList, setStaffList] = useState([]);
   const [busca, setBusca] = useState("");
   const [selecionados, setSelecionados] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Busca apenas os funcionários com o cargo 'staff' no Supabase ao carregar a página
+  // Busca apenas o staff no Supabase
   useEffect(() => {
     async function fetchEquipe() {
       const { data, error } = await supabase
         .from("perfis")
         .select("*")
-        .eq("role", "staff") // Filtra para trazer apenas os funcionários comuns
+        .ilike("role", "%staff%") 
         .order("nome_completo", { ascending: true });
 
       if (error) {
         console.error("Erro ao buscar equipe:", error);
       } else {
-        setFuncionarios(data || []);
+        setStaffList(data || []);
       }
       setLoading(false);
     }
@@ -37,10 +38,10 @@ export default function EquipeCoordenador() {
     fetchEquipe();
   }, []);
 
-  // Lógica da barra de pesquisa em tempo real
-  const filtrados = funcionarios.filter((func) => {
-    const nome = func.nome_completo ? func.nome_completo.toLowerCase() : "";
-    const cargo = func.role ? func.role.toLowerCase() : "";
+  // Lógica da barra de pesquisa
+  const filtrados = staffList.filter((membro) => {
+    const nome = membro.nome_completo ? membro.nome_completo.toLowerCase() : "";
+    const cargo = membro.role ? membro.role.toLowerCase() : "";
     const termo = busca.toLowerCase();
     return nome.includes(termo) || cargo.includes(termo);
   });
@@ -83,52 +84,69 @@ export default function EquipeCoordenador() {
 
         {/* Contador Dinâmico */}
         <p className="text-xs text-gray-400 font-medium mb-4">
-          Listando {filtrados.length} de {funcionarios.length} - <span className="font-bold text-gray-300">{selecionados.length} selecionados</span>
+          Listando {filtrados.length} de {staffList.length} - <span className="font-bold text-gray-300">{selecionados.length} selecionados</span>
         </p>
 
-        {/* Lista de Funcionários Renderizada */}
+        {/* Lista do Staff Renderizada */}
         <div className="flex flex-col gap-2">
           {loading ? (
             <p className="text-center text-gray-500 text-sm py-4">Carregando equipe...</p>
           ) : filtrados.length === 0 ? (
-            <p className="text-center text-gray-500 text-sm py-4">Nenhum funcionário encontrado.</p>
+            <p className="text-center text-gray-500 text-sm py-4">Nenhum membro do staff encontrado.</p>
           ) : (
-            filtrados.map((func) => (
-              <div key={func.id} className="relative border border-[#333] bg-[#1e1e1e] p-3 flex gap-3">
-                
-                {/* Checkbox customizado */}
-                <div className="pt-1">
-                  <div 
-                    onClick={() => handleSelecionar(func.id)}
-                    className={`w-5 h-5 border flex items-center justify-center cursor-pointer transition-colors ${
-                      selecionados.includes(func.id) ? "bg-[#333] border-[#555]" : "border-[#444] bg-[#2a2a2a]"
-                    }`}
-                  >
-                    {selecionados.includes(func.id) && <div className="w-3 h-3 bg-gray-400" />}
+            filtrados.map((membro) => {
+              
+              // === LÓGICA DA FOTO ADICIONADA AQUI ===
+              const urlDaFoto = membro.foto_url || membro.avatar_url;
+              
+              return (
+                <div key={membro.id} className="relative border border-[#333] bg-[#1e1e1e] p-3 flex gap-3">
+                  
+                  {/* Checkbox */}
+                  <div className="pt-1">
+                    <div 
+                      onClick={() => handleSelecionar(membro.id)}
+                      className={`w-5 h-5 border flex items-center justify-center cursor-pointer transition-colors ${
+                        selecionados.includes(membro.id) ? "bg-[#333] border-[#555]" : "border-[#444] bg-[#2a2a2a]"
+                      }`}
+                    >
+                      {selecionados.includes(membro.id) && <div className="w-3 h-3 bg-gray-400" />}
+                    </div>
                   </div>
-                </div>
 
-                {/* Foto (Placeholder Branco como na imagem) */}
-                <div className="w-16 h-16 bg-white shrink-0 rounded-sm overflow-hidden flex items-center justify-center">
-                   {/* Espaço reservado para a foto do funcionário no futuro */}
-                </div>
+                  {/* === FOTO DINÂMICA (SUBSTITUI O QUADRADO BRANCO) === */}
+                  <div className="w-16 h-16 bg-[#2a2a2a] shrink-0 rounded-sm overflow-hidden flex items-center justify-center border border-[#444]">
+                    {urlDaFoto ? (
+                      <img 
+                        src={urlDaFoto} 
+                        alt={`Foto de ${membro.nome_completo}`} 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User size={28} className="text-[#555]" />
+                    )}
+                  </div>
 
-                {/* Dados do Funcionário */}
-                <div className="flex flex-col justify-center">
-                  <h3 className="text-white font-bold text-lg leading-tight">
-                    {func.nome_completo || "Nome não definido"}
-                  </h3>
-                  <p className="text-gray-400 text-sm mt-1 capitalize">
-                    {func.role || "Cargo não definido"}
-                  </p>
-                </div>
+                  {/* Dados do Staff */}
+                  <div className="flex flex-col justify-center">
+                    <h3 className="text-white font-bold text-lg leading-tight">
+                      {membro.nome_completo || "Nome não definido"}
+                    </h3>
+                    <p className="text-gray-400 text-sm mt-1 capitalize">
+                      {membro.role || "Cargo não definido"}
+                    </p>
+                  </div>
 
-                {/* Botão Info */}
-                <button className="absolute right-3 bottom-3 w-8 h-8 border border-[#444] bg-[#2a2a2a] flex items-center justify-center text-gray-400 hover:bg-[#333] transition-colors rounded-sm">
-                  <Info size={18} strokeWidth={2} />
-                </button>
-              </div>
-            ))
+                  {/* Botão Info */}
+                  <button 
+                    onClick={() => router.push(`/coordenador/equipe/${membro.id}`)}
+                    className="absolute right-3 bottom-3 w-8 h-8 border border-[#444] bg-[#2a2a2a] flex items-center justify-center text-gray-400 hover:bg-[#333] hover:text-white transition-colors rounded-sm cursor-pointer"
+                  >
+                    <Info size={18} strokeWidth={2} />
+                  </button>
+                </div>
+              );
+            })
           )}
         </div>
       </div>
@@ -136,13 +154,13 @@ export default function EquipeCoordenador() {
       {/* ===== BARRA INFERIOR FIXA ===== */}
       <div className="fixed bottom-0 left-0 w-full bg-[#141414] p-4 flex flex-col gap-2 border-t border-[#222]">
         
-        {/* Botão que leva para a tela de Cadastrar Novo Funcionário (CORRIGIDO AQUI) */}
+        {/* Botão de Cadastrar */}
         <button 
           onClick={() => router.push("/coordenador/equipe/novo")} 
           className="w-full bg-[#1e50cf] hover:bg-[#163a99] text-white font-medium text-lg py-4 flex items-center justify-center gap-2 rounded-sm transition-colors"
         >
           <Plus size={24} strokeWidth={2.5} />
-          Adicionar funcionário
+          Adicionar Staff
         </button>
 
         {/* Botão de Filtros Extras */}
@@ -160,7 +178,10 @@ export default function EquipeCoordenador() {
              <img src="/icon.png" alt="Logo" className="h-full object-contain" />
           </div>
           
-          <button className="p-2 border border-[#444] rounded-sm bg-transparent hover:bg-[#2a2a2a] transition-colors">
+          <button 
+            onClick={() => router.push("/coordenador")}
+            className="p-2 border border-[#444] rounded-sm bg-transparent hover:bg-[#2a2a2a] transition-colors"
+          >
             <Menu size={26} className="text-gray-400" strokeWidth={1.5} />
           </button>
         </div>

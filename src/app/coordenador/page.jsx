@@ -4,9 +4,7 @@ import { useRouter } from "next/navigation";
 import { 
   Home, 
   Users, 
-  Handshake, 
   Calendar, 
-  ClipboardList, 
   Menu, 
   X, 
   ChevronDown 
@@ -42,7 +40,7 @@ export default function PainelCoordenadora() {
       <div className="p-4">
         <div className="w-full border border-[#333] p-3 flex justify-between items-center bg-[#1a1a1a] rounded-sm">
           <div className="w-9 h-9 flex items-center justify-center opacity-40 grayscale">
-             {/* Logo provisória da Wadjet */}
+             {/* Logo provisória */}
              <img src="/icon.png" alt="Logo" className="h-full object-contain" />
           </div>
           
@@ -66,7 +64,7 @@ export default function PainelCoordenadora() {
           {/* Topo do Menu: Créditos e Botão Fechar */}
           <div className="flex justify-between items-start mb-6 pt-2">
             <div className="text-gray-500 text-sm leading-snug">
-              <p>© 2026 Seriguela Solutions.</p>
+              <p>© 2026 Sunset Field Solutions.</p>
               <p>Todos os direitos reservados.</p>
               <p className="mt-4 text-gray-400">Perfil da Coordenação - Protótipo</p>
             </div>
@@ -79,7 +77,7 @@ export default function PainelCoordenadora() {
             </button>
           </div>
 
-          {/* Lista de Botões de Navegação (SEM O FINANCEIRO) */}
+          {/* Lista de Botões de Navegação (SEM CLIENTES E SEM ESCALAS) */}
           <div className="flex flex-col gap-2 flex-1">
             
             <button 
@@ -91,7 +89,7 @@ export default function PainelCoordenadora() {
             </button>
 
             <button 
-              onClick={() => router.push("/coordenador/equipe")} // Ajuste a rota se necessário
+              onClick={() => router.push("/coordenador/equipe")}
               className="w-full border border-[#333] bg-[#1e1e1e] p-4 flex items-center gap-4 text-gray-300 text-lg hover:bg-[#2a2a2a] transition-colors rounded-sm"
             >
               <Users size={24} strokeWidth={1.5} className="text-gray-400" />
@@ -99,23 +97,12 @@ export default function PainelCoordenadora() {
             </button>
 
             <button className="w-full border border-[#333] bg-[#1e1e1e] p-4 flex items-center gap-4 text-gray-300 text-lg hover:bg-[#2a2a2a] transition-colors rounded-sm">
-              <Handshake size={24} strokeWidth={1.5} className="text-gray-400" />
-              <span>Clientes</span>
-            </button>
-
-            <button className="w-full border border-[#333] bg-[#1e1e1e] p-4 flex items-center gap-4 text-gray-300 text-lg hover:bg-[#2a2a2a] transition-colors rounded-sm">
               <Calendar size={24} strokeWidth={1.5} className="text-gray-400" />
               <span>Eventos</span>
             </button>
 
-            <button className="w-full border border-[#333] bg-[#1e1e1e] p-4 flex items-center gap-4 text-gray-300 text-lg hover:bg-[#2a2a2a] transition-colors rounded-sm">
-              <ClipboardList size={24} strokeWidth={1.5} className="text-gray-400" />
-              <span>Escalas</span>
-            </button>
-
             {/* Perfil da Lana */}
             <div className="w-full border border-[#333] bg-[#1e1e1e] p-3 mt-2 flex gap-3 cursor-pointer hover:bg-[#2a2a2a] transition-colors rounded-sm">
-              {/* Espaço para a foto em branco como no design */}
               <div className="w-16 h-16 bg-white shrink-0 rounded-sm"></div>
               
               <div className="flex flex-col justify-center">

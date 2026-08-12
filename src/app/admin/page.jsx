@@ -9,7 +9,6 @@ import {
   Contact2, 
   Handshake, 
   CopyPlus, 
-  CalendarClock, 
   Wallet,
   ChevronDown
 } from "lucide-react";
@@ -76,15 +75,6 @@ export default function AdminPage() {
             <span className="text-gray-200 text-lg">Eventos</span>
           </button>
 
-          {/* O CLIQUE DE ESCALAS FOI ADICIONADO AQUI */}
-          <button 
-            onClick={() => router.push("/admin/escalas")}
-            className="border border-[#333] bg-[#1a1a1a] flex items-center gap-4 p-4 hover:bg-[#222] transition-colors text-left cursor-pointer w-full"
-          >
-            <CalendarClock size={22} className="text-gray-400" strokeWidth={1.5} />
-            <span className="text-gray-200 text-lg">Escalas</span>
-          </button>
-
           {/* O CLIQUE DO FINANCEIRO FOI ADICIONADO AQUI */}
           <button 
             onClick={() => router.push("/admin/financeiro")}
@@ -107,7 +97,7 @@ export default function AdminPage() {
         {/* Rodapé do Menu */}
         <div className="mt-auto flex justify-between items-end border-t border-[#333] pt-6">
           <div className="w-10 h-10 opacity-40 grayscale">
-            <img src="/icon.png" alt="Wadjet Logo" className="w-full h-full object-contain" onError={(e) => e.target.style.display='none'} />
+            <img src="/icon.png" alt="Logo" className="w-full h-full object-contain" onError={(e) => e.target.style.display='none'} />
           </div>
           <button className="border border-[#333] bg-[#1a1a1a] p-2 flex items-center justify-center hover:bg-[#222] transition-colors cursor-pointer">
             <ChevronDown size={24} className="text-gray-400" strokeWidth={1.5} />
@@ -140,7 +130,7 @@ export default function AdminPage() {
       {/* Barra de Navegação Inferior */}
       <div className="fixed bottom-6 w-[calc(100%-3rem)] mx-6 border border-[#333] bg-[#1a1a1a] p-3 flex justify-between items-center z-40">
         <div className="w-8 h-8 opacity-40 grayscale ml-2">
-          <img src="/icon.png" alt="Wadjet Logo" className="w-full h-full object-contain" onError={(e) => e.target.style.display='none'} />
+          <img src="/icon.png" alt="Logo" className="w-full h-full object-contain" onError={(e) => e.target.style.display='none'} />
         </div>
         
         <button 
