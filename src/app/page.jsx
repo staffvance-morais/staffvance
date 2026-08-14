@@ -3,8 +3,8 @@
 import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import { Mail, LockKeyhole } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 // Componentes reutilizáveis
 import AuthLayout from "./components/AuthLayout";
@@ -14,12 +14,6 @@ import Divider from "./components/Divider";
 import FormInput from "./components/FormInput";
 import SolidButton from "./components/SolidButton";
 import LinkButton from "./components/LinkButton";
-
-// Configuração do Supabase usando as variáveis de ambiente
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-);
 
 export default function Login() {
   const router = useRouter();
@@ -47,23 +41,31 @@ export default function Login() {
 
     // Busca o cargo (role) do usuário na tabela 'perfis'
     const userId = data.user.id;
-    const { data: perfil } = await supabase
+    const { data: perfil, error: perfilError } = await supabase
       .from("perfis")
       .select("role")
       .eq("id", userId)
       .single();
 
+    if (perfilError || !perfil) {
+      setErro("Não foi possível encontrar o perfil do usuário.");
+      setLoading(false);
+      // Optional: sign out the user if their profile is missing
+      // await supabase.auth.signOut();
+      return;
+    }
+
     // Corta espaços em branco e joga tudo para minúsculo
     const userRole = perfil?.role?.toLowerCase().trim() || "";
 
-    // Redirecionamento baseado no cargo do usuário
-    if (userRole === "admin" || userRole === "owner") {
-      router.push("/admin");
-    } else if (userRole === "coordenador") {
-      router.push("/coordenador");
-    } else {
-      router.push("/freelancers");
-    }
+    const roleRedirects = {
+      admin: "/admin",
+      owner: "/admin",
+      coordenador: "/coordenador",
+    };
+
+    const redirectPath = roleRedirects[userRole] || "/freelancers";
+    router.push(redirectPath);
   };
 
   return (
