@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
+import Link from "next/link"; // <- Arma secreta do Next.js adicionada aqui
 import { Home, Calendar, X, ChevronDownSquare } from "lucide-react";
 
 const supabase = createClient(
@@ -60,10 +61,8 @@ export default function DashboardFreelancer() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] font-sans selection:bg-[#333] flex items-center justify-center p-4">
-      {/* Painel central com borda, imitando o "modal/drawer" do design */}
       <div className="w-full max-w-sm border border-[#333] bg-[#1c1c1c] relative flex flex-col min-h-[90vh] p-6">
 
-        {/* Botão Fechar (X) */}
         <button
           onClick={handleFechar}
           className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center border border-[#3a3a3a] rounded-none bg-[#2a2a2a] text-[#999] hover:bg-[#333] hover:text-[#ccc] transition-colors cursor-pointer"
@@ -72,14 +71,12 @@ export default function DashboardFreelancer() {
           <X size={18} strokeWidth={1.5} />
         </button>
 
-        {/* TOPO: Textos legais */}
         <div className="text-[#666] text-[13px] font-medium leading-relaxed tracking-wide pr-12">
           <p>© 2026 Sunset Field Solutions.</p>
           <p>Todos os direitos reservados.</p>
-          <p className="mt-4">Perfil da Staff - Protótipo</p>
+          <p className="mt-4">Perfil da Staff</p>
         </div>
 
-        {/* CENTRO: Navegação, centralizada verticalmente */}
         <div className="flex-1 flex flex-col justify-center gap-3 py-8">
 
           <button className="flex items-center w-full p-4 border border-[#3a3a3a] rounded-none bg-[#2a2a2a] hover:bg-[#333] transition-colors cursor-pointer">
@@ -87,18 +84,19 @@ export default function DashboardFreelancer() {
             <span className="text-[#ddd] text-[17px] font-normal tracking-wide">Página inicial</span>
           </button>
 
-          <button
-            onClick={() => router.push("/eventos")}
+          {/* ==========================================
+              USANDO O COMPONENTE LINK (FORÇA A ROTA CERTA)
+              ========================================== */}
+          <Link
+            href="/freelancers/eventos"
             className="flex items-center w-full p-4 border border-[#3a3a3a] rounded-none bg-[#2a2a2a] hover:bg-[#333] transition-colors cursor-pointer"
           >
             <Calendar className="text-[#999] w-6 h-6 mr-4" strokeWidth={1.5} />
             <span className="text-[#ddd] text-[17px] font-normal tracking-wide">Eventos</span>
-          </button>
+          </Link>
 
-          {/* Divisória */}
           <div className="w-full h-px bg-[#3a3a3a] my-2"></div>
 
-          {/* Caixa de Perfil */}
           <button className="flex items-center w-full p-4 border border-[#3a3a3a] rounded-none bg-[#2a2a2a] hover:bg-[#333] transition-colors text-left cursor-pointer">
             <div className="w-16 h-16 bg-white shrink-0 mr-4 flex items-center justify-center overflow-hidden">
               {perfil?.foto_url ? (
@@ -113,12 +111,9 @@ export default function DashboardFreelancer() {
 
         </div>
 
-        {/* Divisória acima do rodapé */}
         <div className="w-full h-px bg-[#3a3a3a]"></div>
 
-        {/* RODAPÉ: Logo e botão Sair */}
         <div className="flex justify-between items-end pt-4">
-
           <div className="w-10 h-10 flex items-center justify-start opacity-30 hover:opacity-50 transition-opacity">
             <img
               src="/icon.png"
@@ -135,7 +130,6 @@ export default function DashboardFreelancer() {
           >
             <ChevronDownSquare size={24} strokeWidth={1.3} />
           </button>
-
         </div>
 
       </div>

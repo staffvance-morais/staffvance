@@ -15,23 +15,19 @@ export default function EscalasPage() {
   });
   const [loading, setLoading] = useState(false);
   
-  // Novos estados para controlar a disponibilidade
   const [funcionarios, setFuncionarios] = useState([]);
   const [escalasAtivas, setEscalasAtivas] = useState([]);
 
-  // Busca os dados assim que a página abre
   useEffect(() => {
     fetchDisponibilidade();
   }, []);
 
   const fetchDisponibilidade = async () => {
     try {
-      // 1. Pega todos os funcionários da tabela perfis
       const { data: funcData } = await supabase
         .from("perfis")
         .select("id, nome_completo, cargo");
         
-      // 2. Pega todas as escalas que estão ativas (Escalado ou Confirmado)
       const { data: escData } = await supabase
         .from("escalas")
         .select("staff_id, posto_trabalho")
@@ -46,7 +42,6 @@ export default function EscalasPage() {
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  // Função mágica para o Morais: Clica no nome e preenche o ID no formulário
   const selecionarFuncionario = (id) => {
     setForm({ ...form, staff_id: id });
     window.scrollTo({ top: 0, behavior: "smooth" }); // Rola a página de volta pro topo
@@ -60,10 +55,8 @@ export default function EscalasPage() {
       if (error) throw error;
       
       alert("Funcionário escalado com sucesso!");
-      // Limpa o formulário, mas mantém o ID do evento para facilitar se ele for escalar várias pessoas pro mesmo evento
       setForm({ ...form, staff_id: "", posto_trabalho: "", turno_inicio: "", turno_fim: "", status: "Escalado" });
       
-      // Atualiza a lista de disponíveis e ocupados automaticamente
       fetchDisponibilidade();
     } catch (error) {
       alert("Erro ao escalar: " + error.message);
@@ -72,7 +65,6 @@ export default function EscalasPage() {
     }
   };
 
-  // Separando quem está livre e quem está ocupado
   const funcionariosOcupados = funcionarios.filter(f => escalasAtivas.some(e => e.staff_id === f.id));
   const funcionariosLivres = funcionarios.filter(f => !escalasAtivas.some(e => e.staff_id === f.id));
 
