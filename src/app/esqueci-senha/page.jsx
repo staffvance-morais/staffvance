@@ -1,9 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { Mail, ArrowLeft } from "lucide-react";
+import { Mail } from "lucide-react";
+
+// Componentes reutilizáveis
+import Alert from "../components/Alert";
+import AuthLayout from "../components/AuthLayout";
+import AuthCard from "../components/AuthCard";
+import Divider from "../components/Divider";
+import AuthHeader from "../components/AuthHeader";
+import AuthTitle from "../components/AuthTitle";
+import AuthSubtitle from "../components/AuthSubtitle";
+import FormInput from "../components/FormInput";
+import SolidButton from "../components/SolidButton";
 
 export default function EsqueciSenha() {
   const router = useRouter();
@@ -19,7 +31,7 @@ export default function EsqueciSenha() {
     setErro("");
 
     try {
-      // O Supabase envia um e-mail com um link seguro. 
+      // O Supabase envia um e-mail com um link seguro.
       // O redirectTo é para onde o usuário volta após clicar no link do e-mail.
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/nova-senha`,
@@ -27,7 +39,9 @@ export default function EsqueciSenha() {
 
       if (error) throw error;
 
-      setMensagem("Link de recuperação enviado! Verifique sua caixa de entrada ou spam.");
+      setMensagem(
+        "Link de recuperação enviado! Verifique sua caixa de entrada ou spam.",
+      );
     } catch (error) {
       console.error("Erro ao recuperar senha:", error);
       setErro("Não foi possível enviar o e-mail. Verifique se o endereço está correto.");
@@ -37,84 +51,59 @@ export default function EsqueciSenha() {
   };
 
   return (
-    <div className="min-h-screen bg-[#111111] flex flex-col items-center justify-center p-4 font-sans selection:bg-[#333]">
-      
-      {/* Logo */}
-      <div className="mb-10 w-48 opacity-80">
-        <img 
-          src="/icon.png" 
-          alt="Wadjet Segurança" 
-          className="w-full h-auto object-contain" 
-          onError={(e) => { e.target.style.display = 'none'; }} 
+    <AuthLayout>
+      <Alert variant="error">{erro}</Alert>
+      <Alert variant="success">{mensagem}</Alert>
+
+      <AuthCard>
+        <Image
+          src="/logo_full_gray.svg"
+          alt="Wadjet Segurança"
+          width={0}
+          height={0}
+          sizes="100vw"
+          priority
+          className="pointer-events-none mb-4 h-auto w-64 object-contain"
         />
-      </div>
 
-      <div className="w-full max-w-sm flex flex-col gap-6">
-        
-        <div className="text-center mb-2">
-          <h1 className="text-xl font-bold text-[#eee] mb-2">Recuperar Senha</h1>
-          <p className="text-[#888] text-sm">
-            Digite seu e-mail cadastrado e enviaremos um link para redefinir sua senha.
-          </p>
-        </div>
+        <Divider />
 
-        <form onSubmit={handleRecuperarSenha} className="flex flex-col gap-4">
-          
-          {/* Mensagens de Sucesso ou Erro */}
-          {mensagem && (
-            <div className="bg-[#16a34a]/20 border border-[#16a34a] text-[#4ade80] p-3 text-sm rounded-sm text-center">
-              {mensagem}
-            </div>
-          )}
-          {erro && (
-            <div className="bg-[#dc2626]/20 border border-[#dc2626] text-[#f87171] p-3 text-sm rounded-sm text-center">
-              {erro}
-            </div>
-          )}
+        <AuthHeader>
+          <AuthTitle>Recuperar Senha</AuthTitle>
+          <AuthSubtitle>
+            Digite seu e-mail para receber o link de recuperação.
+          </AuthSubtitle>
+        </AuthHeader>
 
-          {/* Campo de E-mail */}
-          <div className="relative flex items-center">
-            <div className="absolute left-4 text-[#777]">
-              <Mail size={18} strokeWidth={1.5} />
-            </div>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="E-mail"
-              required
-              className="w-full bg-[#1c1c1c] border border-[#333] text-[#ddd] text-sm rounded-sm py-3 pl-11 pr-4 outline-none focus:border-[#555] transition-colors"
-            />
-          </div>
+        <form onSubmit={handleRecuperarSenha} className="flex w-full flex-col gap-4">
+          <FormInput
+            icon={Mail}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="E-mail"
+            required
+          />
 
-          {/* Botão Enviar (Verde) */}
-          <button
+          <SolidButton
             type="submit"
             disabled={loading || mensagem !== ""}
-            className="w-full bg-[#16a34a] hover:bg-[#15803d] text-white font-bold py-3 rounded-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+            variant="primary"
           >
-            {loading ? "Enviando..." : "Enviar link de recuperação"}
-          </button>
+            {loading ? "Enviando..." : "Enviar link"}
+          </SolidButton>
 
-          {/* Botão Voltar (Azul) */}
-          <button
+        <Divider />
+
+          <SolidButton
             type="button"
             onClick={() => router.push("/")}
-            className="w-full bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-bold py-3 rounded-sm transition-colors flex items-center justify-center gap-2 mt-4"
+            variant="tertiary"
           >
-            <ArrowLeft size={18} strokeWidth={2} />
-            Voltar para o Login
-          </button>
-
+            Voltar
+          </SolidButton>
         </form>
-      </div>
-
-      {/* Rodapé Legal */}
-      <div className="absolute bottom-8 text-center text-[#555] text-xs font-medium leading-relaxed tracking-wide">
-        <p>© 2026 Sunset Field Solutions.</p>
-        <p>Todos os direitos reservados.</p>
-      </div>
-
-    </div>
+      </AuthCard>
+    </AuthLayout>
   );
 }

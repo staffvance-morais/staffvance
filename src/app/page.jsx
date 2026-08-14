@@ -6,6 +6,15 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { Mail, LockKeyhole } from "lucide-react";
 
+// Componentes reutilizáveis
+import AuthLayout from "./components/AuthLayout";
+import Alert from "./components/Alert";
+import AuthCard from "./components/AuthCard";
+import Divider from "./components/Divider";
+import FormInput from "./components/FormInput";
+import SolidButton from "./components/SolidButton";
+import LinkButton from "./components/LinkButton";
+
 // Configuração do Supabase usando as variáveis de ambiente
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -58,97 +67,60 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen p-6 bg-neutral-900 flex flex-col items-center justify-center relative font-sans text-center rounded-none">
-      <div className="w-full max-w-sm flex flex-col items-center relative">
-        {/* Alerta de Erro no Topo */}
-        {erro && (
-          <div className="w-full bg-[#9f201d] text-white text-center py-3 px-4 mb-6 text-sm font-semibold shadow-md">
-            {erro}
-          </div>
-        )}
+    <AuthLayout>
+      <Alert variant="error">{erro}</Alert>
 
-        {/* Interface */}
-        <div className="w-full max-w-full bg-neutral-800 px-6 py-12 border-2 border-neutral-700 flex flex-col gap-4 items-center text-center">
-          {/* Logo */}
-          <Image
-            src="/logo_full_gray.svg"
-            alt="Wadjet Segurança"
-            width={0}
-            height={0}
-            sizes="100vw"
-            priority
-            className="w-64 h-auto object-contain"
+      <AuthCard>
+        <Image
+          src="/logo_full_gray.svg"
+          alt="Wadjet Segurança"
+          width={0}
+          height={0}
+          sizes="100vw"
+          priority
+          className="mb-4 h-auto w-64 object-contain pointer-events-none"
+        />
+
+        <Divider />
+
+        <form onSubmit={handleLogin} className="flex w-full flex-col gap-4">
+          <FormInput
+            icon={Mail}
+            type="email"
+            placeholder="E-mail"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
           />
 
-          {/* Divisor */}
-          <div className="w-full h-px bg-neutral-600"></div>
+          <FormInput
+            icon={LockKeyhole}
+            type="password"
+            placeholder="Senha"
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            required
+          />
 
-          {/* Formulário */}
-          <form onSubmit={handleLogin} className="w-full flex flex-col gap-4">
-            {/* Input E-mail */}
-            <div className="flex w-full items-center gap-4 bg-neutral-700 border-2 border-neutral-600 px-4 py-2 text-neutral-400 transition-all focus-within:border-neutral-500">
-              <Mail className="w-6 h-6 shrink-0" />
-              <input
-                type="email"
-                placeholder="E-mail"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full bg-transparent text-lg outline-none placeholder:text-neutral-400"
-              />
-            </div>
+          <SolidButton type="submit" disabled={loading}>
+            {loading ? "Entrando..." : "Entrar"}
+          </SolidButton>
 
-            {/* Input Senha */}
-            <div className="flex w-full items-center gap-4 bg-neutral-700 border-2 border-neutral-600 px-4 py-2 text-neutral-400 transition-all focus-within:border-neutral-500">
-              <LockKeyhole className="w-6 h-6 shrink-0" />
-              <input
-                type="password"
-                placeholder="Senha"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
-                required
-                className="w-full bg-transparent text-lg outline-none placeholder:text-neutral-400"
-              />
-            </div>
+          <LinkButton onClick={() => router.push("/esqueci-senha")}>
+            Esqueci a senha
+          </LinkButton>
 
-            {/* Entrar */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-green-600 border-green-500 border-2 text-white font-semibold text-lg py-2 transition-colors hover:bg-green-500 hover:border-green-400 cursor-pointer"
-            >
-              {loading ? "Entrando..." : "Entrar"}
-            </button>
+          <Divider />
 
-            {/* Esqueci a senha */}
-            <button
-              type="button"
-              onClick={() => router.push("/esqueci-senha")}
-              className="-mt-2 text-neutral-400 text-md underline transition-colors hover:text-neutral-300 focus:text-neutral-400 cursor-pointer"
-            >
-              Esqueci a senha
-            </button>
-
-            {/* Divisor */}
-            <div className="w-full h-px bg-neutral-600"></div>
-
-            {/* Cadastre-se */}
-            <button
-              type="button"
-              onClick={() => router.push("/cadastro")}
-              className="w-full bg-blue-700 text-white font-semibold text-lg py-2 transition-colors border-2 border-blue-600 hover:bg-blue-600 hover:border-blue-500 focus:bg-blue-600 focus:border-blue-500 cursor-pointer"
-            >
-              Cadastre-se
-            </button>
-          </form>
-        </div>
-      </div>
-
-      {/* Rodapé */}
-      <div className="absolute bottom-6 text-center text-sm text-neutral-700 flex flex-col gap-1">
-        <p>© 2026 Sunset Field Solutions.</p>
-        <p>Todos os direitos reservados.</p>
-      </div>
-    </div>
+          <SolidButton
+            type="button"
+            onClick={() => router.push("/cadastro")}
+            variant="secondary"
+          >
+            Cadastre-se
+          </SolidButton>
+        </form>
+      </AuthCard>
+    </AuthLayout>
   );
 }
