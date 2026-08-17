@@ -1,158 +1,127 @@
 "use client";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { ArrowLeft, User, Phone, FileText, Briefcase } from "lucide-react";
+import { ArrowLeft, User, Phone, Edit3, Save, Loader2, Award, FileText } from "lucide-react";
 
-// Configuração do Supabase
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
-export default function DetalhesMembroAdmin() {
+export default function PerfilDetalhado() {
   const router = useRouter();
-  const { id } = useParams();
-  
-  const [membro, setMembro] = useState(null);
+  const perfilId = useParams().id;
+  const [perfil, setPerfil] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [erro, setErro] = useState("");
+  const [editMode, setEditMode] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+
+  // Estados Editáveis
+  const [classificacao, setClassificacao] = useState("");
+  const [anotacoes, setAnotacoes] = useState("");
 
   useEffect(() => {
-    async function fetchDetalhes() {
-      if (!id) return;
-      
-      const { data, error } = await supabase
-        .from("perfis")
-        .select("*")
-        .eq("id", id)
-        .single();
+    const fetchPerfil = async () => {
+      try {
+        const { data } = await supabase.from('perfis').select('*').eq('id', perfilId).single();
+        if (data) {
+          setPerfil(data);
+          setClassificacao(data.classificacao || "");
+          setAnotacoes(data.anotacoes || "");
+        }
+      } catch (error) { console.error(error); } finally { setLoading(false); }
+    };
+    if (perfilId) fetchPerfil();
+  }, [perfilId]);
 
-      if (error) {
-        console.error("Erro ao buscar detalhes do staff:", error);
-        setErro("Perfil não encontrado no sistema.");
-      } else {
-        setMembro(data);
-      }
-      setLoading(false);
-    }
-    
-    fetchDetalhes();
-  }, [id]);
+  const handleSalvarEdicao = async () => {
+    setSalvando(true);
+    try {
+      await supabase.from('perfis').update({ classificacao, anotacoes }).eq('id', perfilId);
+      setPerfil(prev => ({ ...prev, classificacao, anotacoes }));
+      setEditMode(false);
+    } catch (error) { alert("Erro ao salvar"); } finally { setSalvando(false); }
+  };
 
-  // Função para pegar a foto dinâmica
-  const urlDaFoto = membro?.foto_url || membro?.avatar_url;
+  if (loading) return <div className="min-h-screen bg-[#111] flex items-center justify-center text-white"><Loader2 className="animate-spin" /></div>;
 
   return (
-    <div className="min-h-screen bg-[#141414] text-gray-300 font-sans flex flex-col relative pb-10">
-      
-      {/* Cabeçalho de Voltar (Roteado para o painel do ADMIN) */}
-      <div className="p-4 flex items-center gap-3 pt-6 mb-2">
-        <button 
-          onClick={() => router.push("/admin/funcionarios")}
-          className="p-2 bg-[#2a2a2a] border border-[#333] rounded-sm hover:bg-[#333] transition-colors flex items-center justify-center text-gray-300"
-        >
-          <ArrowLeft size={20} strokeWidth={2} />
-        </button>
-        <span className="text-gray-300 text-base tracking-wide font-medium">Perfil Detalhado</span>
-      </div>
-      
-      <div className="w-full h-px bg-[#333] mb-6"></div>
+    <div className="min-h-screen bg-[#111111] font-sans flex flex-col items-center">
+      <div className="w-full max-w-[800px] min-h-screen bg-[#1a1a1a] border-x border-[#333]">
+        
+        <div className="flex justify-between items-center p-5 border-b border-[#333]">
+          <div className="flex items-center gap-4">
+            <button onClick={() => router.back()} className="text-[#999] hover:text-white"><ArrowLeft size={24} /></button>
+            <h1 className="text-white font-semibold">Perfil Detalhado</h1>
+          </div>
+          <button onClick={() => editMode ? handleSalvarEdicao() : setEditMode(true)} className="flex items-center gap-2 text-[#2563eb] hover:text-[#1d4ed8] font-bold">
+            {salvando ? <Loader2 className="animate-spin" size={18}/> : editMode ? <Save size={18} /> : <Edit3 size={18} />}
+            {editMode ? "SALVAR" : "EDITAR"}
+          </button>
+        </div>
 
-      {/* Área de Conteúdo */}
-      <div className="px-4 flex-1">
-        {loading ? (
-          <div className="flex flex-col items-center justify-center mt-20 gap-4">
-             <div className="w-8 h-8 border-4 border-gray-600 border-t-[#1e50cf] rounded-full animate-spin"></div>
-             <p className="text-gray-500">Carregando dados...</p>
+        <div className="flex flex-col items-center pt-10 pb-6 border-b border-[#333]">
+          <div className="w-24 h-24 bg-[#333] rounded-full overflow-hidden border-2 border-[#444] mb-4 flex items-center justify-center">
+            {perfil?.foto_url ? <img src={perfil.foto_url} className="w-full h-full object-cover" /> : <User size={40} className="text-[#777]"/>}
           </div>
-        ) : erro ? (
-          <div className="bg-[#dc2626]/20 border border-[#dc2626] text-[#f87171] p-4 text-sm rounded-sm text-center">
-            {erro}
+          <h2 className="text-[22px] font-bold text-white capitalize">{perfil?.nome_completo}</h2>
+          <p className="text-[#2563eb] uppercase tracking-widest text-[12px] font-bold mt-1">{perfil?.role}</p>
+        </div>
+
+        <div className="p-6">
+          <p className="text-[#777] text-[12px] font-bold uppercase tracking-wider mb-4">Dados Cadastrais</p>
+          
+          <div className="bg-[#222] border border-[#333] rounded-md p-4 mb-3 flex items-center gap-4">
+            <User className="text-[#666]" size={20} />
+            <div>
+              <p className="text-[#999] text-[12px]">Nome Completo</p>
+              <p className="text-[#e5e5e5] capitalize">{perfil?.nome_completo}</p>
+            </div>
           </div>
-        ) : (
-          <div className="flex flex-col gap-6">
+
+          <div className="bg-[#222] border border-[#333] rounded-md p-4 mb-3 flex items-center gap-4">
+            <Phone className="text-[#666]" size={20} />
+            <div>
+              <p className="text-[#999] text-[12px]">WhatsApp</p>
+              <p className="text-[#e5e5e5]">{perfil?.whatsapp || 'Não informado'}</p>
+            </div>
+          </div>
+
+          <div className="mt-8">
+            <p className="text-[#777] text-[12px] font-bold uppercase tracking-wider mb-4 flex items-center gap-2"><Award size={14}/> Gestão Interna (Morais)</p>
             
-            {/* Bloco Superior: Foto e Nome */}
-            <div className="flex flex-col items-center gap-4 bg-[#1a1a1a] border border-[#333] p-6 rounded-sm text-center">
-              
-              {/* === ÁREA DA FOTO ATUALIZADA === */}
-              <div className="w-24 h-24 bg-[#2a2a2a] shrink-0 rounded-sm overflow-hidden flex items-center justify-center shadow-lg border border-[#444]">
-                {urlDaFoto ? (
-                  <img 
-                    src={urlDaFoto} 
-                    alt={`Foto de ${membro?.nome_completo}`} 
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <User size={40} className="text-[#555]" />
-                )}
-              </div>
-              
-              <div>
-                <h1 className="text-2xl font-bold text-white capitalize">
-                  {membro?.nome_completo || "Nome não cadastrado"}
-                </h1>
-                <p className="text-[#1e50cf] font-medium text-sm mt-1 uppercase tracking-widest">
-                  {membro?.role || "Cargo não definido"}
-                </p>
-              </div>
+            <div className="bg-[#222] border border-[#333] rounded-md p-5 mb-4">
+              <p className="text-[#999] text-[13px] mb-3">Classificação do Staff:</p>
+              {editMode ? (
+                <div className="flex gap-3">
+                  {['Ouro', 'Prata', 'Bronze'].map(cat => (
+                    <button key={cat} onClick={() => setClassificacao(cat)} className={`px-4 py-2 rounded-sm border font-bold text-[13px] ${classificacao === cat ? 'bg-[#2563eb] border-[#2563eb] text-white' : 'border-[#444] text-[#777] hover:bg-[#333]'}`}>
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <span className={`px-4 py-1.5 rounded-sm font-bold text-[13px] uppercase ${classificacao === 'Ouro' ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50' : classificacao === 'Prata' ? 'bg-gray-400/20 text-gray-300 border border-gray-400/50' : classificacao === 'Bronze' ? 'bg-orange-700/20 text-orange-500 border border-orange-700/50' : 'text-[#666] border border-[#444]'}`}>
+                  {classificacao || 'Não Classificado'}
+                </span>
+              )}
             </div>
 
-            {/* Bloco de Informações Detalhadas */}
-            <div className="flex flex-col gap-3">
-              <h2 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1 ml-1">Dados Cadastrais</h2>
-              
-              {/* Item: Nome */}
-              <div className="flex items-center gap-4 bg-[#1e1e1e] border border-[#333] p-4 rounded-sm">
-                <div className="text-gray-500">
-                  <User size={20} strokeWidth={1.5} />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs text-gray-500">Nome Completo</span>
-                  <span className="text-gray-200 capitalize">{membro?.nome_completo || "-"}</span>
-                </div>
-              </div>
-
-              {/* Item: CPF */}
-              <div className="flex items-center gap-4 bg-[#1e1e1e] border border-[#333] p-4 rounded-sm">
-                <div className="text-gray-500">
-                  <FileText size={20} strokeWidth={1.5} />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs text-gray-500">CPF</span>
-                  <span className="text-gray-200">{membro?.cpf || "Não informado"}</span>
-                </div>
-              </div>
-
-              {/* Item: WhatsApp */}
-              <div className="flex items-center gap-4 bg-[#1e1e1e] border border-[#333] p-4 rounded-sm">
-                <div className="text-gray-500">
-                  <Phone size={20} strokeWidth={1.5} />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs text-gray-500">WhatsApp</span>
-                  <span className="text-gray-200">{membro?.whatsapp || "Não informado"}</span>
-                </div>
-              </div>
-
-              {/* Item: ID do Sistema (Oculto ou para controle interno) */}
-              <div className="flex items-center gap-4 bg-[#1e1e1e] border border-[#333] p-4 rounded-sm opacity-60">
-                <div className="text-gray-600">
-                  <Briefcase size={20} strokeWidth={1.5} />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs text-gray-500">ID no Sistema</span>
-                  <span className="text-gray-400 text-[10px] break-all">{membro?.id}</span>
-                </div>
-              </div>
-
+            <div className="bg-[#222] border border-[#333] rounded-md p-5">
+              <p className="text-[#999] text-[13px] mb-3 flex items-center gap-2"><FileText size={16}/> Anotações Confidenciais:</p>
+              {editMode ? (
+                <textarea 
+                  value={anotacoes} 
+                  onChange={(e) => setAnotacoes(e.target.value)} 
+                  className="w-full bg-[#111] border border-[#444] rounded-sm p-3 text-white text-[14px] outline-none focus:border-[#2563eb] min-h-[100px]"
+                  placeholder="Escreva observações sobre o comportamento, faltas..."
+                />
+              ) : (
+                <p className="text-[#ccc] text-[14px] whitespace-pre-wrap">{anotacoes || 'Nenhuma anotação registrada.'}</p>
+              )}
             </div>
-
           </div>
-        )}
-      </div>
 
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { 
   CalendarDays, 
@@ -62,9 +63,9 @@ const EventCard = ({ image, title, location, date, time, client, staffCount, isL
               <Handshake size={18} className="text-[#777]" /> 
               <span>{client || "Cliente não informado"}</span>
             </div>
-            <div className="flex items-center text-[#999999] text-[14.5px] gap-3">
-              <ClipboardList size={18} className="text-[#777]" /> 
-              <span>{staffCount} escalados</span>
+            <div className="flex items-center text-[#22c55e] font-medium text-[14.5px] gap-3">
+              <ClipboardList size={18} className="text-[#22c55e]" /> 
+              <span>{staffCount}</span>
             </div>
           </div>
 
@@ -90,9 +91,10 @@ const EventCard = ({ image, title, location, date, time, client, staffCount, isL
 };
 
 // ==========================================
-// PÁGINA PRINCIPAL: EVENTOS (MORAIS)
+// PÁGINA PRINCIPAL: EVENTOS
 // ==========================================
 export default function PainelEventosMorais() {
+  const router = useRouter(); 
   const [eventos, setEventos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState("");
@@ -100,18 +102,21 @@ export default function PainelEventosMorais() {
   useEffect(() => {
     const fetchEventos = async () => {
       try {
-        // Busca os eventos reais cadastrados no Supabase ordenados pelos mais recentes
-        const { data, error } = await supabase
+        // 1. Busca os eventos
+        const { data: evData, error: evError } = await supabase
           .from('eventos')
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (evError) throw evError;
 
-        if (data) {
-          // Formata os dados para o layout da tela
-          const eventosFormatados = data.map(ev => {
-            // Formata a data se existir
+        // 2. Busca todas as escalas apenas para contar quem está em qual evento
+        const { data: escData } = await supabase
+          .from('escalas')
+          .select('evento_id');
+
+        if (evData) {
+          const eventosFormatados = evData.map(ev => {
             let dataFormatada = "";
             let horaFormatada = "";
             if (ev.data_inicio) {
@@ -121,6 +126,9 @@ export default function PainelEventosMorais() {
                 (ev.data_fim ? new Date(ev.data_fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : "");
             }
 
+            // Conta quantas vezes o ID deste evento aparece na tabela de escalas
+            const count = escData ? escData.filter(esc => esc.evento_id === ev.id).length : 0;
+
             return {
               id: ev.id,
               title: ev.titulo,
@@ -129,7 +137,7 @@ export default function PainelEventosMorais() {
               date: dataFormatada,
               time: horaFormatada,
               image: ev.foto_local,
-              staffCount: "0/0", // Depois podemos puxar da tabela escalas se quiser
+              staffCount: `${count} escalado(s)`, // Agora é dinâmico e real!
               isLive: false,
               selected: true
             };
@@ -147,7 +155,6 @@ export default function PainelEventosMorais() {
     fetchEventos();
   }, []);
 
-  // Filtro da barra de pesquisa
   const eventosFiltrados = eventos.filter(ev => 
     ev.title?.toLowerCase().includes(busca.toLowerCase()) ||
     ev.location?.toLowerCase().includes(busca.toLowerCase())
@@ -156,7 +163,6 @@ export default function PainelEventosMorais() {
   return (
     <div className="min-h-screen bg-[#171717] font-sans flex flex-col items-center justify-center">
       
-      {/* Container que simula a tela do celular/painel estreito */}
       <div className="w-full max-w-[400px] h-[100dvh] flex flex-col p-4 bg-[#171717] relative">
         
         {/* CABEÇALHO */}
@@ -232,7 +238,7 @@ export default function PainelEventosMorais() {
             </div>
           </button>
 
-          {/* Rodapé (Menu) */}
+          {/* RODAPÉ ATUALIZADO: BOTÃO MENU COM REDIRECIONAMENTO */}
           <div className="flex items-stretch justify-between border border-[#3a3a3a] bg-[#1a1a1a] rounded-sm overflow-hidden h-[60px]">
             <div className="w-16 flex items-center justify-center opacity-30">
               <img 
@@ -242,7 +248,11 @@ export default function PainelEventosMorais() {
                 onError={(e) => { e.target.style.display = "none"; }}
               />
             </div>
-            <button className="w-[60px] border-l border-[#3a3a3a] flex items-center justify-center text-[#777] bg-[#222] hover:bg-[#2a2a2a] transition-colors cursor-pointer">
+            
+            <button 
+              onClick={() => router.push('/admin')} 
+              className="w-[60px] border-l border-[#3a3a3a] flex items-center justify-center text-[#777] bg-[#222] hover:bg-[#2a2a2a] transition-colors cursor-pointer"
+            >
               <Menu size={32} strokeWidth={1.5} />
             </button>
           </div>
