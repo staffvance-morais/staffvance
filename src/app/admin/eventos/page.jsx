@@ -9,7 +9,7 @@ import {
   Calendar, 
   Handshake, 
   ClipboardList, 
-  Info, 
+  Info, // <-- Voltamos para o ícone de Informação (i)
   Check, 
   Filter, 
   ChevronUp, 
@@ -26,7 +26,7 @@ const supabase = createClient(
 // ==========================================
 // COMPONENTE: CARD DO EVENTO (DINÂMICO)
 // ==========================================
-const EventCard = ({ image, title, location, date, time, client, staffCount, isLive, selected }) => {
+const EventCard = ({ id, image, title, location, date, time, client, staffCount, isLive, selected, router }) => {
   return (
     <div className="border border-[#3a3a3a] bg-[#222222] flex flex-col mb-4 rounded-sm overflow-hidden shrink-0">
       {/* Imagem do Evento */}
@@ -80,7 +80,14 @@ const EventCard = ({ image, title, location, date, time, client, staffCount, isL
               <div></div>
             )}
             
-            <button className="w-11 h-11 border border-[#444] rounded-sm bg-[#2a2a2a] flex items-center justify-center text-[#999] hover:bg-[#333] transition-colors cursor-pointer">
+            {/* ==================================================
+                BOTÃO DE INFO (Leva para a página de Detalhes)
+                ================================================== */}
+            <button 
+              onClick={() => router.push(`/admin/eventos/${id}`)}
+              title="Ver Detalhes do Evento"
+              className="w-11 h-11 border border-[#444] rounded-sm bg-[#2a2a2a] flex items-center justify-center text-[#999] hover:bg-[#333] hover:text-[#2563eb] transition-colors cursor-pointer"
+            >
               <Info size={26} strokeWidth={1.5} />
             </button>
           </div>
@@ -102,7 +109,6 @@ export default function PainelEventosMorais() {
   useEffect(() => {
     const fetchEventos = async () => {
       try {
-        // 1. Busca os eventos
         const { data: evData, error: evError } = await supabase
           .from('eventos')
           .select('*')
@@ -110,7 +116,6 @@ export default function PainelEventosMorais() {
 
         if (evError) throw evError;
 
-        // 2. Busca todas as escalas apenas para contar quem está em qual evento
         const { data: escData } = await supabase
           .from('escalas')
           .select('evento_id');
@@ -126,7 +131,6 @@ export default function PainelEventosMorais() {
                 (ev.data_fim ? new Date(ev.data_fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : "");
             }
 
-            // Conta quantas vezes o ID deste evento aparece na tabela de escalas
             const count = escData ? escData.filter(esc => esc.evento_id === ev.id).length : 0;
 
             return {
@@ -137,7 +141,7 @@ export default function PainelEventosMorais() {
               date: dataFormatada,
               time: horaFormatada,
               image: ev.foto_local,
-              staffCount: `${count} escalado(s)`, // Agora é dinâmico e real!
+              staffCount: `${count} escalado(s)`, 
               isLive: false,
               selected: true
             };
@@ -188,7 +192,7 @@ export default function PainelEventosMorais() {
           Listando <span className="text-[#e5e5e5] font-semibold">{eventosFiltrados.length}</span> eventos
         </div>
 
-        {/* ÁREA DE ROLAGEM DOS CARDS REAIS */}
+        {/* ÁREA DE ROLAGEM DOS CARDS */}
         <div className="flex-1 overflow-y-auto pb-4 custom-scrollbar">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 text-[#777]">
@@ -204,6 +208,7 @@ export default function PainelEventosMorais() {
             eventosFiltrados.map((ev) => (
               <EventCard 
                 key={ev.id}
+                id={ev.id}
                 image={ev.image}
                 title={ev.title}
                 location={ev.location}
@@ -213,12 +218,13 @@ export default function PainelEventosMorais() {
                 staffCount={ev.staffCount}
                 isLive={ev.isLive}
                 selected={ev.selected}
+                router={router} 
               />
             ))
           )}
         </div>
 
-        {/* ÁREA INFERIOR FIXA (BOTÕES E MENU) */}
+        {/* ÁREA INFERIOR FIXA */}
         <div className="shrink-0 pt-2 flex flex-col gap-3 bg-[#171717]">
           
           <Link 
@@ -228,7 +234,6 @@ export default function PainelEventosMorais() {
             Cadastrar evento
           </Link>
 
-          {/* Botão Mais Opções */}
           <button className="w-full bg-[#2a2a2a] border border-[#3a3a3a] hover:bg-[#333] text-[#a3a3a3] py-[14px] flex items-center justify-between px-4 rounded-sm transition-colors cursor-pointer">
             <div className="flex items-center gap-3 text-[17px] tracking-wide">
               <Filter size={22} strokeWidth={1.5} /> Mais opções...
@@ -238,7 +243,6 @@ export default function PainelEventosMorais() {
             </div>
           </button>
 
-          {/* RODAPÉ ATUALIZADO: BOTÃO MENU COM REDIRECIONAMENTO */}
           <div className="flex items-stretch justify-between border border-[#3a3a3a] bg-[#1a1a1a] rounded-sm overflow-hidden h-[60px]">
             <div className="w-16 flex items-center justify-center opacity-30">
               <img 

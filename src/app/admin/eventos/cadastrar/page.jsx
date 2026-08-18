@@ -1,10 +1,20 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { 
-  ArrowLeft, CalendarDays, MapPin, Clock, Image as ImageIcon, 
-  Map, Briefcase, Save, Users, UploadCloud, Check, Loader2
+import {
+  CalendarDays,
+  ChevronRight,
+  Handshake,
+  Search,
+  MapPin,
+  ChevronDown,
+  ChevronUp,
+  Plus,
+  Clock,
+  ImagePlus,
+  Menu,
+  Loader2
 } from "lucide-react";
 
 // Conexão com o Supabase
@@ -13,179 +23,468 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-// ==========================================
-// COMPONENTE: CAMPO DE FORMULÁRIO CUSTOMIZADO
-// ==========================================
-const FormInput = ({ label, icon: Icon, type = "text", placeholder, value, onChange, options = [] }) => (
-  <div className="mb-5">
-    <label className="block text-[#999999] text-[14px] mb-1.5 ml-1">{label}</label>
-    <div className="relative">
-      {Icon && <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#666]" size={20} strokeWidth={1.5} />}
-      {type === "select" ? (
-        <select value={value} onChange={onChange} className="w-full bg-[#222222] border border-[#3a3a3a] text-[#e5e5e5] h-[50px] pl-[46px] pr-4 outline-none text-[16px] rounded-sm focus:border-[#2563eb] transition-colors appearance-none">
-          <option value="" disabled>Selecione uma opção...</option>
-          {options.map((opt, index) => (
-            <option key={index} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      ) : (
-        <input type={type} placeholder={placeholder} value={value} onChange={onChange} className="w-full bg-[#222222] border border-[#3a3a3a] text-[#e5e5e5] h-[50px] pl-[46px] pr-4 outline-none text-[16px] rounded-sm placeholder:text-[#555] focus:border-[#2563eb] transition-colors" />
-      )}
-    </div>
-  </div>
-);
+const STORAGE_BUCKET = "eventos-fotos";
 
-// ==========================================
-// PÁGINA PRINCIPAL: CADASTRAR EVENTO
-// ==========================================
 export default function CadastrarEvento() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  
-  const [formData, setFormData] = useState({
-    titulo: "", nome_contratante: "", endereco_texto: "", 
-    data_evento: "", hora_inicio: "", hora_fim: "", 
-    foto_local: "", foto_arquivo: null, mapa_tatico: ""
-  });
+  const fileInputRef = useRef(null);
 
-  const handleChange = (campo, valor) => setFormData(prev => ({ ...prev, [campo]: valor }));
-  const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) setFormData(prev => ({ ...prev, foto_arquivo: e.target.files[0] }));
+  const [salvando, setSalvando] = useState(false);
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
+
+  // Estados dos campos principais
+  const [titulo, setTitulo] = useState("");
+  const [contratante, setContratante] = useState("");
+  const [clienteId, setClienteId] = useState(null);
+  const [dataOperacao, setDataOperacao] = useState("");
+  const [horaInicio, setHoraInicio] = useState("");
+  const [horaTermino, setHoraTermino] = useState("");
+
+  // Estados dos Menus Expansíveis
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+
+  // Estados da Localização
+  const [localSelecionado, setLocalSelecionado] = useState("");
+  const [customLocalName, setCustomLocalName] = useState("");
+  const [customLocalImage, setCustomLocalImage] = useState("");
+
+  // Estados Dinâmicos do Banco
+  const [clientes, setClientes] = useState([]);
+  const [carregandoClientes, setCarregandoClientes] = useState(false);
+
+  const locaisDeFabrica = [
+    { nome: "Estádio Presidente Vargas", tatico: true },
+    { nome: "Estádio Carlos de Alencar Pinto", tatico: false },
+    { nome: "Ginásio Aécio de Borba", tatico: false },
+    { nome: "Cidade Vozão", tatico: false }
+  ];
+
+  const [locais, setLocais] = useState(locaisDeFabrica);
+  const [carregandoLocais, setCarregandoLocais] = useState(false);
+
+  // ----------------------------------------------------
+  // BUSCA CLIENTES
+  // ----------------------------------------------------
+  useEffect(() => {
+    if (showClientDropdown && clientes.length === 0) {
+      buscarClientes();
+    }
+  }, [showClientDropdown]);
+
+  const buscarClientes = async () => {
+    setCarregandoClientes(true);
+    try {
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("id, representante, empresa")
+        .order("representante", { ascending: true });
+
+      if (error) {
+        console.error("Erro ao buscar clientes:", error);
+      }
+
+      if (data) {
+        setClientes(data);
+      }
+    } catch (err) {
+      console.error("Erro inesperado:", err);
+    } finally {
+      setCarregandoClientes(false);
+    }
   };
 
-  const handleSalvarEEscalar = async () => {
-    setLoading(true);
+  const handleSelecionarCliente = (cliente) => {
+    const nomeExibicao = cliente.empresa 
+      ? `${cliente.representante} (${cliente.empresa})` 
+      : cliente.representante;
+
+    setContratante(nomeExibicao);
+    setClienteId(cliente.id);
+    setShowClientDropdown(false);
+  };
+
+  // ----------------------------------------------------
+  // BUSCA LOCAIS DINÂMICOS (Com Filtro Anti-Duplicata Inteligente)
+  // ----------------------------------------------------
+  useEffect(() => {
+    if (showLocationDropdown && locais.length === locaisDeFabrica.length) {
+      buscarLocaisSalvos();
+    }
+  }, [showLocationDropdown]);
+
+  const buscarLocaisSalvos = async () => {
+    setCarregandoLocais(true);
     try {
-      let imagemFinal = formData.foto_local;
+      const { data, error } = await supabase.from("eventos").select("endereco_texto");
 
-      if (formData.foto_local === "novo" && formData.foto_arquivo) {
-        const fileExt = formData.foto_arquivo.name.split('.').pop();
-        const fileName = `${Date.now()}.${fileExt}`;
+      if (data && !error) {
+        // 1. Pega todos os nomes e remove espaços extras nas pontas
+        const todosNomes = data.map((e) => e.endereco_texto?.trim()).filter(Boolean);
+        
+        // 2. Remove duplicatas ignorando letras maiúsculas/minúsculas
+        const locaisMap = new Map();
+        todosNomes.forEach(nome => {
+          const key = nome.toLowerCase();
+          if (!locaisMap.has(key)) {
+            locaisMap.set(key, nome); // Guarda a versão original (ex: "Arena Castelão")
+          }
+        });
+        const nomesUnicos = Array.from(locaisMap.values());
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('fotos_locais')
-          .upload(fileName, formData.foto_arquivo);
+        // 3. Filtra garantindo que não vai repetir nenhum da lista de fábrica
+        const nomesNovos = nomesUnicos.filter((novoNome) => {
+          const novoNomeLower = novoNome.toLowerCase();
+          return !locaisDeFabrica.some((fabrica) => fabrica.nome.toLowerCase() === novoNomeLower);
+        });
 
-        if (uploadError) throw new Error("Erro ao fazer upload da imagem");
-
-        const { data: publicUrlData } = supabase.storage.from('fotos_locais').getPublicUrl(fileName);
-        imagemFinal = publicUrlData.publicUrl; 
+        // 4. Adiciona à lista final
+        const locaisExtras = nomesNovos.map((nome) => ({ nome: nome, tatico: false }));
+        setLocais([...locaisDeFabrica, ...locaisExtras]);
       }
+    } catch (err) {
+      console.error("Erro ao buscar locais:", err);
+    } finally {
+      setCarregandoLocais(false);
+    }
+  };
 
-      let dataInicioTimestamp = null;
-      let dataFimTimestamp = null;
+  // ----------------------------------------------------
+  // UPLOAD DA FOTO DO LOCAL
+  // ----------------------------------------------------
+  const handleUploadFoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-      if (formData.data_evento && formData.hora_inicio) {
-        dataInicioTimestamp = new Date(`${formData.data_evento}T${formData.hora_inicio}`).toISOString();
-      }
-      if (formData.data_evento && formData.hora_fim) {
-        dataFimTimestamp = new Date(`${formData.data_evento}T${formData.hora_fim}`).toISOString();
-      }
+    setEnviandoFoto(true);
+    try {
+      const extensao = file.name.split(".").pop();
+      const nomeArquivo = `locais/${Date.now()}.${extensao}`;
 
-      const { data: eventoData, error: eventoError } = await supabase
-        .from('eventos')
-        .insert([{
-          titulo: formData.titulo || "Evento Sem Título",
-          nome_contratante: formData.nome_contratante || null,
-          endereco_texto: formData.endereco_texto || null,
-          data_inicio: dataInicioTimestamp,
-          data_fim: dataFimTimestamp,
-          foto_local: imagemFinal || null,
-          mapa_tatico: formData.mapa_tatico || null
-        }])
+      const { error: uploadError } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(nomeArquivo, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from(STORAGE_BUCKET)
+        .getPublicUrl(nomeArquivo);
+
+      setCustomLocalImage(publicUrlData.publicUrl);
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao enviar imagem. Verifique se o bucket 'eventos-fotos' existe no Supabase.");
+    } finally {
+      setEnviandoFoto(false);
+    }
+  };
+
+  // ----------------------------------------------------
+  // SALVAR NOVO EVENTO
+  // ----------------------------------------------------
+  const handleSalvar = async () => {
+    if (!titulo || !dataOperacao || !horaInicio) {
+      alert("Preencha pelo menos o Título, Data e Início da operação.");
+      return;
+    }
+
+    setSalvando(true);
+
+    try {
+      const dataInicioCompleta = new Date(`${dataOperacao}T${horaInicio}:00`).toISOString();
+      const dataFimCompleta = horaTermino ? new Date(`${dataOperacao}T${horaTermino}:00`).toISOString() : null;
+
+      const enderecoFinal = localSelecionado === "Outro (Personalizar)" ? customLocalName : localSelecionado;
+      const possuiMapaTatico = localSelecionado === "Estádio Presidente Vargas";
+
+      const { data, error } = await supabase
+        .from("eventos")
+        .insert([
+          {
+            titulo: titulo,
+            cliente_id: clienteId,
+            nome_contratante: contratante,
+            endereco_texto: enderecoFinal,
+            data_inicio: dataInicioCompleta,
+            data_fim: dataFimCompleta,
+            foto_local: customLocalImage || null,
+            mapa_tatico: possuiMapaTatico
+          }
+        ])
         .select()
         .single();
 
-      if (eventoError) throw eventoError;
+      if (error) throw error;
 
-      router.push(`/admin/eventos/${eventoData.id}/escalar`);
-
+      router.push(`/admin/eventos/${data.id}/escalar`);
     } catch (error) {
       console.error(error);
-      alert("Erro ao salvar: " + error.message);
+      alert("Erro ao cadastrar. Verifique os dados.");
     } finally {
-      setLoading(false);
+      setSalvando(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#171717] font-sans flex flex-col items-center">
-      <div className="w-full max-w-[500px] min-h-screen flex flex-col bg-[#1c1c1c] relative border-x border-[#2a2a2a]">
-        
-        {/* CABEÇALHO */}
-        <div className="flex items-center gap-4 text-[#cccccc] p-5 border-b border-[#333333] sticky top-0 bg-[#1c1c1c] z-10">
-          <button onClick={() => router.back()} className="w-10 h-10 flex items-center justify-center rounded-sm hover:bg-[#2a2a2a] transition-colors cursor-pointer">
-            <ArrowLeft size={24} strokeWidth={1.5} />
-          </button>
-          <div>
-            <h1 className="text-[20px] font-semibold tracking-wide text-[#e5e5e5]">Novo Evento</h1>
-            <p className="text-[13px] text-[#777]">Preencha os dados da operação</p>
-          </div>
+    <div className="min-h-screen bg-[#171717] font-sans flex flex-col items-center pb-10">
+      <div className="w-full max-w-[400px] min-h-screen flex flex-col bg-[#171717] relative">
+
+        {/* BREADCRUMB */}
+        <div className="flex items-center gap-2 p-4 text-[#aaa] text-[14px] border-b border-[#333333]">
+          <CalendarDays size={18} />
+          <span>Eventos</span>
+          <ChevronRight size={16} />
+          <span className="text-[#e5e5e5]">Cadastrar evento</span>
         </div>
 
-        {/* FORMULÁRIO */}
-        <div className="p-6 flex-1">
-          <FormInput label="Nome do Evento (Título)" icon={CalendarDays} placeholder="Ex: Fortaleza x Ceará" value={formData.titulo} onChange={(e) => handleChange("titulo", e.target.value)} />
-          <FormInput label="Contratante / Cliente" icon={Briefcase} placeholder="Ex: Federação Cearense" value={formData.nome_contratante} onChange={(e) => handleChange("nome_contratante", e.target.value)} />
-          <FormInput label="Local (Endereço/Estádio)" icon={MapPin} placeholder="Ex: Estádio Presidente Vargas" value={formData.endereco_texto} onChange={(e) => handleChange("endereco_texto", e.target.value)} />
+        <div className="flex-1 overflow-y-auto pb-[100px] custom-scrollbar">
 
-          {/* ==========================================
-              CORREÇÃO DE RESPONSIVIDADE: DATA E HORA
-              ========================================== */}
-          <FormInput label="Data da Operação" icon={CalendarDays} type="date" value={formData.data_evento} onChange={(e) => handleChange("data_evento", e.target.value)} />
-          <div className="grid grid-cols-2 gap-4">
-            <FormInput label="Início" icon={Clock} type="time" value={formData.hora_inicio} onChange={(e) => handleChange("hora_inicio", e.target.value)} />
-            <FormInput label="Término" icon={Clock} type="time" value={formData.hora_fim} onChange={(e) => handleChange("hora_fim", e.target.value)} />
-          </div>
+          {/* DADOS DO EVENTO */}
+          <h2 className="text-[#e5e5e5] text-[18px] font-bold px-4 pt-5 pb-3">Dados do Evento</h2>
 
-          <div className="w-full h-px bg-[#333] my-4"></div>
+          <div className="mx-4 flex flex-col bg-[#222222] border border-[#444] rounded-sm">
 
-          <h2 className="text-[#e5e5e5] text-[16px] font-medium mb-4">Recursos Visuais da Escala</h2>
-
-          <FormInput 
-            label="Foto do Local (Para os cards)" icon={ImageIcon} type="select" value={formData.foto_local} onChange={(e) => handleChange("foto_local", e.target.value)}
-            options={[
-              { value: "/Presidente_Vargas_Stadium.jpg", label: "Estádio Presidente Vargas" },
-              { value: "/aecio_de_borba.jpg", label: "Ginásio Aécio de Borba" },
-              { value: "novo", label: "➕ Novo Local (Enviar Foto)" },
-              { value: "padrao", label: "Sem foto específica (Padrão)" }
-            ]}
-          />
-
-          {formData.foto_local === "novo" && (
-            <div className="mb-5 animate-in fade-in slide-in-from-top-2 duration-300">
-              <label className="block text-[#999999] text-[14px] mb-1.5 ml-1">Anexar Foto</label>
-              <div className="flex items-center justify-center w-full">
-                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-[#3a3a3a] border-dashed rounded-sm cursor-pointer bg-[#222] hover:bg-[#2a2a2a] hover:border-[#2563eb] transition-colors">
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <UploadCloud className="w-8 h-8 mb-3 text-[#777]" />
-                    <p className="mb-2 text-sm text-[#999]"><span className="font-semibold text-[#e5e5e5]">Clique para enviar</span> ou arraste a foto</p>
-                  </div>
-                  <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
-                </label>
-              </div>
-              {formData.foto_arquivo && <p className="mt-2 text-[14px] text-[#22c55e] flex items-center gap-2"><Check size={16} /> Imagem carregada: {formData.foto_arquivo.name}</p>}
+            {/* Título */}
+            <div className="flex items-center gap-3 p-3.5 border-b border-[#444]">
+              <CalendarDays size={20} className="text-[#777] shrink-0" />
+              <input
+                type="text"
+                placeholder="Título"
+                value={titulo}
+                onChange={(e) => setTitulo(e.target.value)}
+                className="bg-transparent w-full outline-none text-[#e5e5e5] placeholder:text-[#999] text-[16px]"
+              />
             </div>
-          )}
 
-          <FormInput 
-            label="Mapa Tático da Operação" icon={Map} type="select" value={formData.mapa_tatico} onChange={(e) => handleChange("mapa_tatico", e.target.value)}
-            options={[
-              { value: "mapa_pv", label: "Presidente Vargas - Setores Completos" },
-              { value: "nenhum", label: "Não utilizar mapa tático neste evento" }
-            ]}
-          />
+            {/* Contratante / Representante */}
+            <div>
+              <div
+                onClick={() => setShowClientDropdown(!showClientDropdown)}
+                className="flex items-center justify-between p-3.5 border-b border-[#444] cursor-pointer bg-[#222222]"
+              >
+                <div className="flex items-center gap-3">
+                  <Handshake size={20} className="text-[#777]" />
+                  <span className={contratante ? "text-[#e5e5e5] text-[16px]" : "text-[#999] text-[16px]"}>
+                    {contratante || "Contratante"}
+                  </span>
+                </div>
+                <Search size={20} className="text-[#777]" />
+              </div>
+
+              {showClientDropdown && (
+                <div className="bg-[#1a1a1a] border-b border-[#444] flex flex-col shadow-inner">
+                  {carregandoClientes && (
+                    <div className="p-3.5 flex items-center gap-2 text-[#999] text-sm">
+                      <Loader2 className="animate-spin" size={16} />
+                      Carregando contratantes...
+                    </div>
+                  )}
+
+                  {!carregandoClientes && clientes.length > 0 &&
+                    clientes.map((cliente) => (
+                      <div
+                        key={cliente.id}
+                        onClick={() => handleSelecionarCliente(cliente)}
+                        className="p-3.5 text-[#e5e5e5] border-b border-[#333] hover:bg-[#333] cursor-pointer text-[15px] flex items-center justify-between"
+                      >
+                        <span>{cliente.representante}</span>
+                        {cliente.empresa && (
+                          <span className="text-[#888] text-[13px] font-normal">{cliente.empresa}</span>
+                        )}
+                      </div>
+                    ))}
+
+                  <div
+                    onClick={() => router.push("/admin/clientes/cadastrar")}
+                    className="p-3.5 flex items-center justify-between text-[#ccc] font-bold hover:bg-[#333] cursor-pointer text-[15px]"
+                  >
+                    Cadastrar novo
+                    <Plus size={20} className="text-[#ccc]" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Localização */}
+            <div>
+              <div
+                onClick={() => setShowLocationDropdown(!showLocationDropdown)}
+                className="flex items-center justify-between p-3.5 cursor-pointer bg-[#222222]"
+              >
+                <div className="flex items-center gap-3">
+                  <MapPin size={20} className="text-[#777]" />
+                  <span className={localSelecionado ? "text-[#e5e5e5] text-[16px]" : "text-[#999] text-[16px]"}>
+                    {localSelecionado || "Localização"}
+                  </span>
+                </div>
+                {showLocationDropdown ? (
+                  <ChevronUp size={20} className="text-[#777]" />
+                ) : (
+                  <ChevronDown size={20} className="text-[#777]" />
+                )}
+              </div>
+
+              {showLocationDropdown && (
+                <div className="bg-[#1a1a1a] border-t border-[#444] flex flex-col shadow-inner">
+                  {carregandoLocais && (
+                    <div className="p-3.5 flex items-center gap-2 text-[#999] text-[13px]">
+                      <Loader2 className="animate-spin" size={14} /> Buscando novos locais...
+                    </div>
+                  )}
+
+                  {locais.map((loc, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => {
+                        setLocalSelecionado(loc.nome);
+                        setShowLocationDropdown(false);
+                      }}
+                      className="p-3.5 border-b border-[#333] hover:bg-[#333] cursor-pointer flex flex-col"
+                    >
+                      <span className="text-[#e5e5e5] text-[15px]">{loc.nome}</span>
+                      {loc.tatico && (
+                        <div className="flex items-center gap-1.5 mt-1 text-[10px] font-bold tracking-widest text-[#999]">
+                          <div className="w-2 h-2 bg-[#16a34a] rounded-sm"></div>
+                          POSSUI MAPA TÁTICO
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  <div
+                    onClick={() => setLocalSelecionado("Outro (Personalizar)")}
+                    className="p-3.5 border-b border-[#333] text-[#e5e5e5] hover:bg-[#333] cursor-pointer text-[15px]"
+                  >
+                    Outro (Personalizar)
+                  </div>
+
+                  {localSelecionado === "Outro (Personalizar)" && (
+                    <div className="p-3.5 flex flex-col gap-3 bg-[#111111]">
+                      <div className="w-full h-[140px] bg-[#fff] relative rounded-sm overflow-hidden flex items-center justify-center border border-[#444]">
+                        {customLocalImage ? (
+                          <img src={customLocalImage} alt="Local" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-[#ccc] text-[14px]">Sem imagem</span>
+                        )}
+
+                        <input type="file" accept="image/*" ref={fileInputRef} onChange={handleUploadFoto} className="hidden" />
+
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          disabled={enviandoFoto}
+                          className="absolute bottom-0 right-0 bg-[#2563eb] w-12 h-12 flex items-center justify-center text-white cursor-pointer hover:bg-[#1d4ed8] rounded-tl-sm transition-colors"
+                        >
+                          {enviandoFoto ? <Loader2 className="animate-spin" size={20} /> : <ImagePlus size={22} />}
+                        </button>
+                      </div>
+
+                      <input
+                        type="text"
+                        placeholder="Nome do Local"
+                        value={customLocalName}
+                        onChange={(e) => setCustomLocalName(e.target.value)}
+                        className="bg-[#2a2a2a] border border-[#444] text-[#e5e5e5] p-3 rounded-sm outline-none w-full placeholder:text-[#999] text-[15px]"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* DATA E HORÁRIO */}
+          <h2 className="text-[#e5e5e5] text-[18px] font-bold px-4 pt-6 pb-3">Data e Horário</h2>
+
+          <div className="mx-4 flex flex-col bg-[#222222] border border-[#444] rounded-sm">
+
+            <div className="relative flex items-center gap-3 p-3.5 border-b border-[#444]">
+              <CalendarDays size={20} className="text-[#777] shrink-0" />
+              {!dataOperacao && (
+                <span className="text-[#999] pointer-events-none absolute left-11 text-[16px]">Data da operação</span>
+              )}
+              <input
+                type="date"
+                value={dataOperacao}
+                onChange={(e) => setDataOperacao(e.target.value)}
+                className={`bg-transparent w-full outline-none text-[16px] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer ${
+                  dataOperacao ? "text-[#e5e5e5]" : "text-transparent"
+                }`}
+              />
+            </div>
+
+            <div className="relative flex items-center gap-3 p-3.5 border-b border-[#444]">
+              <Clock size={20} className="text-[#777] shrink-0" />
+              {!horaInicio && (
+                <span className="text-[#999] pointer-events-none absolute left-11 text-[16px]">Início</span>
+              )}
+              <input
+                type="time"
+                value={horaInicio}
+                onChange={(e) => setHoraInicio(e.target.value)}
+                className={`bg-transparent w-full outline-none text-[16px] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer ${
+                  horaInicio ? "text-[#e5e5e5]" : "text-transparent"
+                }`}
+              />
+            </div>
+
+            <div className="relative flex items-center gap-3 p-3.5">
+              <Clock size={20} className="text-[#777] rotate-180 shrink-0" />
+              {!horaTermino && (
+                <span className="text-[#999] pointer-events-none absolute left-11 text-[16px]">Término</span>
+              )}
+              <input
+                type="time"
+                value={horaTermino}
+                onChange={(e) => setHoraTermino(e.target.value)}
+                className={`bg-transparent w-full outline-none text-[16px] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer ${
+                  horaTermino ? "text-[#e5e5e5]" : "text-transparent"
+                }`}
+              />
+            </div>
+
+          </div>
+
+          {/* BOTÕES DE AÇÃO */}
+          <div className="px-4 pt-6 pb-4 flex flex-col gap-3">
+            <button
+              onClick={handleSalvar}
+              disabled={salvando}
+              className="w-full bg-[#16a34a] hover:bg-[#15803d] text-white font-bold py-4 rounded-sm flex justify-center items-center gap-2 transition-colors cursor-pointer disabled:opacity-60"
+            >
+              {salvando ? <Loader2 className="animate-spin" size={20} /> : null}
+              {salvando ? "Salvando..." : "Salvar e Escalar"}
+            </button>
+
+            <button
+              onClick={() => router.push("/admin/eventos")}
+              className="w-full bg-[#333333] hover:bg-[#444444] text-[#ccc] font-semibold py-3.5 rounded-sm transition-colors cursor-pointer"
+            >
+              Cancelar
+            </button>
+          </div>
+
         </div>
 
-        {/* BOTÃO PRINCIPAL COM LOADING */}
-        <div className="p-5 border-t border-[#333333] bg-[#1a1a1a] flex flex-col gap-3 sticky bottom-0">
-          <button 
-            onClick={handleSalvarEEscalar} disabled={loading}
-            className="w-full bg-[#2563eb] hover:bg-[#1d4ed8] text-white flex items-center justify-center gap-2 font-semibold py-4 text-[17px] tracking-wide rounded-sm transition-colors shadow-sm disabled:opacity-50"
-          >
-            {loading ? <Loader2 className="animate-spin" size={22} /> : <Users size={22} />}
-            {loading ? "Salvando no Banco..." : "Salvar e Escalar Equipe"}
-          </button>
+        {/* RODAPÉ */}
+        <div className="absolute bottom-0 w-full p-4 bg-[#171717] border-t border-[#2a2a2a]">
+          <div className="flex items-stretch justify-between border border-[#3a3a3a] bg-[#1a1a1a] rounded-sm overflow-hidden h-[60px]">
+            <div className="w-16 flex items-center justify-center opacity-30">
+              <img
+                src="/icon.png"
+                alt="Wadjet Logo"
+                className="w-8 h-8 object-contain grayscale"
+                onError={(e) => { e.target.style.display = "none"; }}
+              />
+            </div>
+
+            <button
+              onClick={() => router.push("/admin")}
+              className="w-[60px] border-l border-[#3a3a3a] flex items-center justify-center text-[#777] bg-[#222] hover:bg-[#2a2a2a] transition-colors cursor-pointer"
+            >
+              <Menu size={32} strokeWidth={1.5} />
+            </button>
+          </div>
         </div>
 
       </div>
