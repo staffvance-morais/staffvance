@@ -12,15 +12,10 @@ import {
 
 export default function PainelCoordenadora() {
   const router = useRouter();
-  // Estado para controlar se o menu está aberto ou fechado
   const [menuAberto, setMenuAberto] = useState(false);
 
   return (
     <div className="min-h-screen bg-[#141414] text-gray-300 font-sans flex flex-col relative overflow-hidden">
-      
-      {/* =========================================================
-          TELA PRINCIPAL: "Em desenvolvimento" (Terceira Imagem) 
-          ========================================================= */}
       
       {/* Cabeçalho */}
       <div className="p-4 flex flex-col pt-6">
@@ -36,11 +31,10 @@ export default function PainelCoordenadora() {
         <p className="text-gray-500 text-lg">Em desenvolvimento</p>
       </div>
 
-      {/* Barra de Navegação Inferior (Tela Inicial) */}
+      {/* Barra de Navegação Inferior */}
       <div className="p-4">
         <div className="w-full border border-[#333] p-3 flex justify-between items-center bg-[#1a1a1a] rounded-sm">
           <div className="w-9 h-9 flex items-center justify-center opacity-40 grayscale">
-             {/* Logo provisória */}
              <img src="/icon.png" alt="Logo" className="h-full object-contain" />
           </div>
           
@@ -53,15 +47,10 @@ export default function PainelCoordenadora() {
         </div>
       </div>
 
-      {/* =========================================================
-          OVERLAY DO MENU: Painel da Lana (Primeira Imagem)
-          Só aparece se 'menuAberto' for true
-          ========================================================= */}
-      
+      {/* OVERLAY DO MENU */}
       {menuAberto && (
         <div className="absolute inset-0 z-50 bg-[#141414] flex flex-col p-4 animate-in fade-in duration-200">
           
-          {/* Topo do Menu: Créditos e Botão Fechar */}
           <div className="flex justify-between items-start mb-6 pt-2">
             <div className="text-gray-500 text-sm leading-snug">
               <p>© 2026 Sunset Field Solutions.</p>
@@ -77,7 +66,6 @@ export default function PainelCoordenadora() {
             </button>
           </div>
 
-          {/* Lista de Botões de Navegação (SEM CLIENTES E SEM ESCALAS) */}
           <div className="flex flex-col gap-2 flex-1">
             
             <button 
@@ -96,12 +84,15 @@ export default function PainelCoordenadora() {
               <span>Equipe</span>
             </button>
 
-            <button className="w-full border border-[#333] bg-[#1e1e1e] p-4 flex items-center gap-4 text-gray-300 text-lg hover:bg-[#2a2a2a] transition-colors rounded-sm">
+            {/* AQUI ESTÁ A CORREÇÃO DO LINK DE EVENTOS */}
+            <button 
+              onClick={() => router.push("/coordenador/eventos")}
+              className="w-full border border-[#333] bg-[#1e1e1e] p-4 flex items-center gap-4 text-gray-300 text-lg hover:bg-[#2a2a2a] transition-colors rounded-sm"
+            >
               <Calendar size={24} strokeWidth={1.5} className="text-gray-400" />
               <span>Eventos</span>
             </button>
 
-            {/* Perfil da Lana */}
             <div className="w-full border border-[#333] bg-[#1e1e1e] p-3 mt-2 flex gap-3 cursor-pointer hover:bg-[#2a2a2a] transition-colors rounded-sm">
               <div className="w-16 h-16 bg-white shrink-0 rounded-sm"></div>
               
@@ -113,7 +104,6 @@ export default function PainelCoordenadora() {
 
           </div>
 
-          {/* Barra Inferior do Menu Aberto (com a setinha para baixo) */}
           <div className="w-full border border-[#333] p-3 flex justify-between items-center bg-[#1a1a1a] rounded-sm mt-4">
             <div className="w-9 h-9 flex items-center justify-center opacity-40 grayscale">
               <img src="/icon.png" alt="Logo" className="h-full object-contain" />

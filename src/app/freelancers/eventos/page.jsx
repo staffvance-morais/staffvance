@@ -1,171 +1,218 @@
 "use client";
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { 
-  Calendar, 
-  MapPin, 
-  Clock, 
-  ShieldCheck, 
-  CheckCircle2, 
-  Menu,
-  ChevronRight,
-  User
-} from "lucide-react";
+import { createClient } from "@supabase/supabase-js";
+import { Calendar, Clock, MapPin, Shield, CheckCircle2, Loader2, User, Map } from "lucide-react";
 
-export default function EventosStaffPage() {
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+
+export default function MinhasEscalas() {
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [escalas, setEscalas] = useState([]);
+  const [perfil, setPerfil] = useState(null);
 
-  // PROTÓTIPO: Estes dados são simulados para você ver o design.
-  // Futuramente, o sistema vai buscar apenas os eventos do Supabase onde este usuário específico foi escalado.
-  const [meusEventos] = useState([
-    {
-      id: 1,
-      nome: "Fortaleza x Ceará - Clássico-Rei",
-      data: "20/08/2026",
-      horario: "16:00",
-      local: "Estádio Presidente Vargas",
-      funcao: "Segurança",
-      setor: "Setor Azul (Elevador)",
-      status: "Confirmado",
-      destaque: true
-    },
-    {
-      id: 2,
-      nome: "Ferroviário x Floresta",
-      data: "25/08/2026",
-      horario: "19:30",
-      local: "Estádio Presidente Vargas",
-      funcao: "Staff",
-      setor: "Entrada Principal (Catraca)",
-      status: "Confirmado",
-      destaque: false
-    }
-  ]);
+  useEffect(() => {
+    const fetchMinhasEscalas = async () => {
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !user) {
+          router.push("/"); 
+          return;
+        }
+
+        const { data: perfilData } = await supabase
+          .from('perfis')
+          .select('nome_completo, nome')
+          .eq('id', user.id)
+          .single();
+        
+        setPerfil(perfilData);
+
+        // CORREÇÃO: Buscando 'data_inicio' em vez das colunas antigas
+        const { data: escalasData, error: escalasError } = await supabase
+          .from('escalas')
+          .select(`
+            id,
+            setor,
+            status_pagamento,
+            eventos (
+              id,
+              titulo,
+              data_inicio,
+              endereco_texto,
+              mapa_tatico
+            )
+          `)
+          .eq('staff_id', user.id); 
+
+        if (escalasError) throw escalasError;
+
+        if (escalasData) {
+          const escalasValidas = escalasData.filter(e => e.eventos !== null);
+          // Ordena pela data de início
+          escalasValidas.sort((a, b) => new Date(a.eventos.data_inicio) - new Date(b.eventos.data_inicio));
+          setEscalas(escalasValidas);
+        }
+      } catch (error) {
+        console.error("Erro detalhado do banco:", error.message || error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMinhasEscalas();
+  }, [router]);
+
+  const abrirMapaTatico = (eventoId) => {
+    router.push(`/mapa?evento=${eventoId}`);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#111111] flex flex-col items-center justify-center text-[#777]">
+        <Loader2 className="animate-spin mb-4 text-[#2563eb]" size={40} />
+        <p>Carregando suas escalas...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-gray-300 font-sans flex flex-col pb-24">
+    <div className="min-h-screen bg-[#0a0a0a] font-sans text-[#e5e5e5]">
       
-      {/* CABEÇALHO DO STAFF */}
-      <div className="px-6 py-4 bg-[#111111] border-b border-[#222] flex justify-between items-center z-30 shadow-md">
-        <div className="w-10 h-10 opacity-80">
-          <img src="/icon.png" alt="Wadjet Logo" className="w-full h-full object-contain" onError={(e) => e.target.style.display='none'} />
+      <header className="flex items-center justify-between p-5 border-b border-[#222]">
+        <div className="flex items-center opacity-70">
+          <Shield size={28} className="text-[#555]" />
         </div>
         
         <div className="flex items-center gap-3">
-          <div className="text-right hidden md:block">
-            <p className="text-white text-sm font-bold capitalize">Olá, Colaborador</p>
-            <p className="text-[#1e50cf] text-[10px] font-bold uppercase tracking-widest">Painel Operacional</p>
+          <div className="text-right hidden sm:block">
+            <p className="text-[14px] font-bold">Olá, {perfil?.nome_completo || perfil?.nome || "Colaborador"}</p>
+            <p className="text-[11px] text-[#2563eb] font-semibold tracking-wider uppercase">Painel Operacional</p>
           </div>
-          <div className="w-10 h-10 bg-[#1a1a1a] border border-[#333] rounded-full flex items-center justify-center">
-            <User size={18} className="text-gray-400" />
+          <div className="w-10 h-10 rounded-full border border-[#333] bg-[#1a1a1a] flex items-center justify-center">
+            <User size={18} className="text-[#888]" />
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="p-4 md:p-6 max-w-3xl mx-auto w-full flex flex-col gap-6 mt-4">
+      <main className="max-w-4xl mx-auto p-6 mt-6">
         
-        {/* MENSAGEM DE BOAS VINDAS */}
-        <div className="mb-2">
-          <h1 className="text-2xl font-black text-white tracking-wide">Minhas Escalas</h1>
-          <p className="text-gray-500 text-sm mt-1">Confira abaixo os próximos eventos em que você está escalado.</p>
+        <div className="mb-10 text-center sm:text-left">
+          <h1 className="text-3xl font-extrabold tracking-tight mb-2">Minhas Escalas</h1>
+          <p className="text-[#888] text-[15px]">Confira abaixo os próximos eventos em que você está escalado.</p>
         </div>
 
-        {/* LISTAGEM DE EVENTOS */}
-        <div className="flex flex-col gap-4">
-          {meusEventos.map((evento) => (
-            <div 
-              key={evento.id} 
-              className={`relative bg-[#111111] border rounded-md overflow-hidden transition-all hover:border-[#444] ${
-                evento.destaque ? 'border-[#1e50cf] shadow-[0_0_15px_rgba(30,80,207,0.15)]' : 'border-[#222]'
-              }`}
-            >
-              {/* Tarja lateral de destaque */}
-              {evento.destaque && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#1e50cf]"></div>
-              )}
+        {escalas.length === 0 ? (
+          <div className="bg-[#111] border border-[#222] rounded-lg p-10 text-center flex flex-col items-center">
+            <Calendar size={48} className="text-[#333] mb-4" />
+            <h3 className="text-[18px] font-bold text-[#ccc] mb-2">Nenhuma escala programada</h3>
+            <p className="text-[#777] max-w-md">Você ainda não foi escalado para nenhuma operação futura. Quando for selecionado, os detalhes aparecerão aqui.</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-6">
+            {escalas.map((escala, index) => {
+              const evento = escala.eventos;
+              const isProximo = index === 0; 
+              
+              // Verifica se tem mapa pelo banco ou pelo nome do local
+              const temMapa = evento.mapa_tatico === true || evento.endereco_texto?.includes("Presidente Vargas");
 
-              <div className="p-5 md:p-6 pl-6">
-                
-                {/* Header do Card (Data e Status) */}
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex flex-col">
-                    <span className="text-[#1e50cf] text-xs font-bold tracking-widest uppercase mb-1">
-                      Próximo Evento
-                    </span>
-                    <h2 className="text-xl font-bold text-white leading-tight">{evento.nome}</h2>
-                  </div>
-                  <div className="flex items-center gap-1.5 px-3 py-1 bg-green-900/20 border border-green-900/50 rounded-sm text-green-500 text-[10px] font-bold uppercase tracking-wider">
-                    <CheckCircle2 size={12} />
-                    {evento.status}
-                  </div>
-                </div>
+              // Extrai a data e a hora corretamente do data_inicio salvo no banco
+              const dataObj = evento.data_inicio ? new Date(evento.data_inicio) : null;
+              const dataExibicao = dataObj ? dataObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : "A definir";
+              const horaExibicao = dataObj ? dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : "A definir";
 
-                {/* Grid de Informações */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                  
-                  {/* Data e Hora */}
-                  <div className="flex items-start gap-3 bg-[#161616] p-3 rounded-sm border border-[#222]">
-                    <Calendar size={18} className="text-gray-500 mt-0.5" />
+              return (
+                <div 
+                  key={escala.id} 
+                  className={`bg-[#111111] rounded-lg overflow-hidden border transition-all ${
+                    isProximo ? 'border-[#2563eb] shadow-[0_0_15px_rgba(37,99,235,0.1)]' : 'border-[#222]'
+                  }`}
+                >
+                  <div className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#222]">
                     <div>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Data do Evento</p>
-                      <p className="text-gray-200 text-sm font-medium">{evento.data}</p>
+                      {isProximo && (
+                        <span className="text-[#2563eb] text-[11px] font-bold tracking-widest uppercase mb-1 block">Próximo Evento</span>
+                      )}
+                      <h2 className="text-[20px] font-bold text-white">{evento.titulo}</h2>
+                    </div>
+                    
+                    <div className="flex items-center gap-1.5 bg-green-500/10 text-green-400 border border-green-500/20 px-3 py-1.5 rounded-sm shrink-0 self-start sm:self-auto">
+                      <CheckCircle2 size={16} />
+                      <span className="text-[12px] font-bold tracking-wider uppercase">Confirmado</span>
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3 bg-[#161616] p-3 rounded-sm border border-[#222]">
-                    <Clock size={18} className="text-gray-500 mt-0.5" />
-                    <div>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Horário de Chegada</p>
-                      <p className="text-gray-200 text-sm font-medium">{evento.horario}</p>
-                    </div>
-                  </div>
-
-                  {/* Local */}
-                  <div className="flex items-start gap-3 bg-[#161616] p-3 rounded-sm border border-[#222] md:col-span-2">
-                    <MapPin size={18} className="text-gray-500 mt-0.5" />
-                    <div>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Local</p>
-                      <p className="text-gray-200 text-sm font-medium">{evento.local}</p>
-                    </div>
-                  </div>
-
-                  {/* Função e Setor (As informações mais importantes pro Staff) */}
-                  <div className="flex items-start gap-3 bg-[#1a1a2e] p-3 rounded-sm border border-[#1e50cf]/30 md:col-span-2 mt-2">
-                    <ShieldCheck size={18} className="text-[#1e50cf] mt-0.5" />
-                    <div className="flex-1 flex justify-between items-center">
+                  <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-[#1a1a1a] border border-[#2a2a2a] p-4 rounded-md flex items-start gap-3">
+                      <Calendar className="text-[#555] shrink-0 mt-0.5" size={18} />
                       <div>
-                        <p className="text-[10px] text-[#1e50cf] uppercase tracking-widest font-bold">Sua Missão</p>
-                        <p className="text-white text-sm font-bold">{evento.funcao} <span className="text-gray-400 font-normal ml-1">em</span> {evento.setor}</p>
+                        <p className="text-[11px] text-[#777] font-bold tracking-wider uppercase">Data do Evento</p>
+                        <p className="text-[15px] font-semibold text-[#ccc] mt-0.5">{dataExibicao}</p>
                       </div>
-                      <ChevronRight size={16} className="text-gray-600" />
+                    </div>
+
+                    <div className="bg-[#1a1a1a] border border-[#2a2a2a] p-4 rounded-md flex items-start gap-3">
+                      <Clock className="text-[#555] shrink-0 mt-0.5" size={18} />
+                      <div>
+                        <p className="text-[11px] text-[#777] font-bold tracking-wider uppercase">Horário de Chegada</p>
+                        <p className="text-[15px] font-semibold text-[#ccc] mt-0.5">{horaExibicao}</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-[#1a1a1a] border border-[#2a2a2a] p-4 rounded-md flex items-start gap-3 md:col-span-2">
+                      <MapPin className="text-[#555] shrink-0 mt-0.5" size={18} />
+                      <div>
+                        <p className="text-[11px] text-[#777] font-bold tracking-wider uppercase">Local</p>
+                        <p className="text-[15px] font-semibold text-[#ccc] mt-0.5">{evento.endereco_texto || "A definir"}</p>
+                      </div>
                     </div>
                   </div>
 
+                  <div className={`p-5 flex flex-col sm:flex-row sm:items-center justify-between border-t ${
+                    isProximo ? 'bg-[#151c2c] border-[#1e293b]' : 'bg-[#161616] border-[#222]'
+                  }`}>
+                    
+                    <div className="flex flex-col gap-3 w-full sm:w-auto">
+                      <div className="flex items-start gap-3">
+                        <Shield className={isProximo ? "text-[#3b82f6]" : "text-[#555]"} size={20} />
+                        <div>
+                          <p className="text-[11px] text-[#777] font-bold tracking-wider uppercase">Sua Missão</p>
+                          <p className="text-[15px] text-[#e5e5e5] mt-0.5">
+                            Segurança em <strong className="text-white">Setor {escala.setor}</strong>
+                          </p>
+                        </div>
+                      </div>
+
+                      {temMapa && (
+                        <button 
+                          onClick={() => abrirMapaTatico(evento.id)}
+                          className="flex items-center gap-2 mt-2 w-fit bg-[#2a2a2a] hover:bg-[#333] border border-[#444] text-[#ccc] px-3 py-2 rounded-sm transition-colors text-[13px] font-semibold"
+                        >
+                          <Map size={16} className="text-[#3b82f6]" />
+                          Ver Mapa Tático do Estádio
+                        </button>
+                      )}
+                    </div>
+                    
+                    {escala.status_pagamento && (
+                      <span className="mt-4 sm:mt-0 self-start sm:self-center text-[12px] bg-green-500/20 text-green-400 px-3 py-1 rounded-sm font-bold uppercase tracking-wider">
+                        Pagamento Liberado
+                      </span>
+                    )}
+                  </div>
+
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* BARRA DE NAVEGAÇÃO INFERIOR MOBILE */}
-      <div className="fixed bottom-0 left-0 w-full bg-[#111] border-t border-[#222] p-4 flex justify-between items-center z-40 md:hidden">
-        <button className="flex flex-col items-center gap-1 text-[#1e50cf]">
-          <Calendar size={20} />
-          <span className="text-[9px] uppercase tracking-widest font-bold">Escalas</span>
-        </button>
-        
-        <button className="flex flex-col items-center gap-1 text-gray-500 hover:text-gray-300">
-          <User size={20} />
-          <span className="text-[9px] uppercase tracking-widest font-bold">Perfil</span>
-        </button>
-
-        <button className="flex flex-col items-center gap-1 text-gray-500 hover:text-gray-300">
-          <Menu size={20} />
-          <span className="text-[9px] uppercase tracking-widest font-bold">Menu</span>
-        </button>
-      </div>
-
+              );
+            })}
+          </div>
+        )}
+      </main>
     </div>
   );
 }

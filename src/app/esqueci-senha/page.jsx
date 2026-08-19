@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Mail } from "lucide-react";
+import ReCAPTCHA from "react-google-recaptcha"; // <-- Importação do reCAPTCHA
 
 // Componentes reutilizáveis
 import Alert from "../components/Alert";
@@ -23,12 +24,22 @@ export default function EsqueciSenha() {
   const [loading, setLoading] = useState(false);
   const [mensagem, setMensagem] = useState("");
   const [erro, setErro] = useState("");
+  
+  // Estado para controlar se o usuário marcou a caixinha do Google
+  const [captchaValido, setCaptchaValido] = useState(false);
 
   const handleRecuperarSenha = async (e) => {
     e.preventDefault();
     setLoading(true);
     setMensagem("");
     setErro("");
+
+    // 1. TRAVA DE SEGURANÇA DO ROBÔ
+    if (!captchaValido) {
+      setErro("Por favor, confirme que você não é um robô marcando a caixa abaixo.");
+      setLoading(false);
+      return;
+    }
 
     try {
       // O Supabase envia um e-mail com um link seguro.
@@ -84,6 +95,15 @@ export default function EsqueciSenha() {
             placeholder="E-mail"
             required
           />
+
+          {/* COMPONENTE DO GOOGLE RECAPTCHA (TEMA ESCURO) */}
+          <div className="flex justify-center w-full my-2 overflow-hidden rounded-md">
+            <ReCAPTCHA
+              sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+              onChange={(valor) => setCaptchaValido(!!valor)}
+              theme="dark"
+            />
+          </div>
 
           <SolidButton
             type="submit"

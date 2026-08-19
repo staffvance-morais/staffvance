@@ -1,7 +1,7 @@
 "use server";
 import { transporter } from "@/lib/nodemailer";
 
-// URL base do seu sistema (Mude para o seu domínio real quando for colocar no ar)
+// URL base do seu sistema
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
 // 1. TEMPLATE: AVISO DE ESCALAÇÃO
@@ -26,7 +26,7 @@ export async function enviarEmailEscalacao(destinatario, nomeStaff, dadosEvento,
           <p style="font-size: 15px; color: #999999; margin-bottom: 25px;">Por favor, acesse o painel do staff para confirmar sua disponibilidade e ver mais instruções.</p>
           
           <div style="text-align: center;">
-            <a href="${SITE_URL}/staff" style="background-color: #2563eb; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 16px; display: inline-block;">Acessar Painel do Staff</a>
+            <a href="${SITE_URL}/freelancers" style="background-color: #2563eb; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 16px; display: inline-block;">Acessar Painel do Staff</a>
           </div>
         </div>
         <div style="background-color: #111; padding: 15px; text-align: center; border-top: 1px solid #333;">

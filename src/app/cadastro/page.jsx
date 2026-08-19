@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import imageCompression from "browser-image-compression";
 import { supabase } from "@/lib/supabase";
+import ReCAPTCHA from "react-google-recaptcha"; // <-- IMPORTAÇÃO DO RECAPTCHA
 import { 
   UserPlus, Mail, Lock, User, CreditCard, 
   Calendar, Smartphone, Wallet, GraduationCap, 
@@ -17,6 +18,9 @@ export default function Cadastro() {
   const [fotoPreview, setFotoPreview] = useState(null);
   const [fotoArquivo, setFotoArquivo] = useState(null);
   const [comprimindo, setComprimindo] = useState(false);
+  
+  // Estado para validar o Captcha
+  const [captchaValido, setCaptchaValido] = useState(false);
 
   const [form, setForm] = useState({
     email: "", senha: "", confirmarSenha: "",
@@ -53,8 +57,14 @@ export default function Cadastro() {
   const handleCadastro = async (e) => {
     e.preventDefault();
     
+    // VALIDAÇÕES INICIAIS
     if (form.senha !== form.confirmarSenha) {
       alert("As senhas não coincidem!");
+      return;
+    }
+
+    if (!captchaValido) {
+      alert("Por favor, confirme que você não é um robô marcando a caixa no final do formulário.");
       return;
     }
 
@@ -105,7 +115,8 @@ export default function Cadastro() {
           data_nascimento: form.dataNascimento || null,
           curso: form.curso,
           uniforme: form.uniforme,
-          foto_url: fotoUrl 
+          foto_url: fotoUrl,
+          email: form.email // Salvando o e-mail na tabela perfis para enviar as notificações depois
         });
 
       if (dbError) {
@@ -124,7 +135,7 @@ export default function Cadastro() {
             whatsapp: form.whatsapp,
             cpf: form.cpf,
             chavePix: form.chavePix,
-            dataNascimento: form.dataNascimento, // ADICIONADO AQUI
+            dataNascimento: form.dataNascimento,
             curso: form.curso,
             uniforme: form.uniforme,
             fotoUrl: fotoUrl,
@@ -193,12 +204,12 @@ export default function Cadastro() {
             
             <div className="relative flex items-center">
               <div className="absolute left-4 text-[#777]"><Lock size={18} strokeWidth={1.5} /></div>
-              <input type="password" name="senha" value={form.senha} onChange={handleChange} placeholder="Senha" required className="w-full bg-[#2a2a2a] text-white text-sm outline-none py-3 pr-4 pl-11 rounded-sm border border-[#3a3a3a] focus:border-[#555] transition-all" />
+              <input type="password" name="senha" value={form.senha} onChange={handleChange} placeholder="Senha" required minLength="6" className="w-full bg-[#2a2a2a] text-white text-sm outline-none py-3 pr-4 pl-11 rounded-sm border border-[#3a3a3a] focus:border-[#555] transition-all" />
             </div>
 
             <div className="relative flex items-center">
               <div className="absolute left-4 text-[#777]"><Lock size={18} strokeWidth={1.5} /></div>
-              <input type="password" name="confirmarSenha" value={form.confirmarSenha} onChange={handleChange} placeholder="Confirmar senha" required className="w-full bg-[#2a2a2a] text-white text-sm outline-none py-3 pr-4 pl-11 rounded-sm border border-[#3a3a3a] focus:border-[#555] transition-all" />
+              <input type="password" name="confirmarSenha" value={form.confirmarSenha} onChange={handleChange} placeholder="Confirmar senha" required minLength="6" className="w-full bg-[#2a2a2a] text-white text-sm outline-none py-3 pr-4 pl-11 rounded-sm border border-[#3a3a3a] focus:border-[#555] transition-all" />
             </div>
           </div>
 
@@ -261,7 +272,16 @@ export default function Cadastro() {
             </div>
           </div>
 
-          <div className="w-full bg-[#9f201d] text-white text-center py-2 px-4 text-xs font-semibold rounded-sm mt-4">
+          {/* VERIFICAÇÃO RECAPTCHA */}
+          <div className="flex justify-center w-full my-3 overflow-hidden rounded-md bg-[#222] border border-[#333]">
+            <ReCAPTCHA
+              sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
+              onChange={(valor) => setCaptchaValido(!!valor)}
+              theme="dark"
+            />
+          </div>
+
+          <div className="w-full bg-[#9f201d] text-white text-center py-2 px-4 text-xs font-semibold rounded-sm mt-1">
             Todas as informações são obrigatórias.
           </div>
 
