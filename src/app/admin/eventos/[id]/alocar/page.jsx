@@ -3,6 +3,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { ArrowLeft, Search, Check, Shield, Save, Loader2, Users } from "lucide-react";
+import { enviarEmailEscalacao } from "@/app/actions/email"; // Importando a função do e-mail
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -21,11 +22,21 @@ function AlocarEquipeConteudo() {
   const [salvando, setSalvando] = useState(false);
   const [equipe, setEquipe] = useState([]);
   const [busca, setBusca] = useState("");
+  const [evento, setEvento] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1. Busca TODOS os perfis (removido o filtro estrito do Supabase para evitar erros com nulos)
+        // 1. Busca os dados do evento para usar no E-mail
+        const { data: eventoData } = await supabase
+          .from('eventos')
+          .select('*')
+          .eq('id', eventoId)
+          .single();
+        
+        if (eventoData) setEvento(eventoData);
+
+        // 2. Busca TODOS os perfis (já incluindo o e-mail que criamos)
         const { data: perfisData, error: perfisError } = await supabase
           .from('perfis')
           .select('*');
@@ -35,7 +46,7 @@ function AlocarEquipeConteudo() {
           alert("Erro ao buscar staffs. Verifique as permissões (RLS) da tabela 'perfis'.");
         }
 
-        // 2. Busca as escalas deste evento
+        // 3. Busca as escalas deste evento
         const { data: escalasData, error: escalasError } = await supabase
           .from('escalas')
           .select('*')
@@ -46,17 +57,18 @@ function AlocarEquipeConteudo() {
         }
 
         if (perfisData) {
-          // Filtra no Javascript tirando apenas quem é admin explicitamente
+          // Filtra tirando administradores
           const staffApenas = perfisData.filter(p => p.role !== 'admin');
 
           const staffFormatado = staffApenas.map(p => {
-            const escalaExistente = escalasData?.find(e => e.staff_id === p.id);
+            const escalaExistente = escalasData?.find(e => e.staff_id === p.id || e.user_id === p.id);
             const estaNesteSetor = escalaExistente?.setor === setorNome;
             const estaEmOutroSetor = escalaExistente && !estaNesteSetor ? escalaExistente.setor : null;
 
             return {
               id: p.id,
-              nome: p.nome_completo || p.nome || "Staff sem nome", // Pega nome_completo ou nome
+              nome: p.nome_completo || p.nome || "Staff sem nome",
+              email: p.email, // Garantindo que o e-mail seja passado
               funcao: p.role || 'Staff Tático',
               foto: p.foto_url || null,
               escalaId: escalaExistente ? escalaExistente.id : null,
@@ -85,7 +97,17 @@ function AlocarEquipeConteudo() {
 
   const handleSalvarEscala = async () => {
     setSalvando(true);
+    let emailsEnviados = 0;
+    let staffsSemEmail = 0;
+
     try {
+      // Blindagem: Garante que os dados do evento existam para o e-mail não ir vazio
+      let dadosEventoAtual = evento;
+      if (!dadosEventoAtual) {
+        const { data: ev } = await supabase.from('eventos').select('*').eq('id', eventoId).single();
+        dadosEventoAtual = ev;
+      }
+
       const selecionados = equipe.filter(e => e.selecionado);
       const desmarcados = equipe.filter(e => !e.selecionado && e.estaNesteSetorOriginalmente);
 
@@ -98,16 +120,43 @@ function AlocarEquipeConteudo() {
       // Insere/Atualiza os selecionados
       for (const staff of selecionados) {
         if (!staff.escalaId) {
+          // 1. Inserir no Banco de Dados
           await supabase.from('escalas').insert({
             evento_id: eventoId,
             staff_id: staff.id,
             setor: setorNome
           });
+
+          // 2. Disparar o E-mail de Escalação para este NOVO staff
+          if (staff.email && dadosEventoAtual) {
+            const res = await enviarEmailEscalacao(
+              staff.email,
+              staff.nome,
+              { 
+                titulo: dadosEventoAtual.titulo || "Operação da Wadjet", 
+                endereco_texto: dadosEventoAtual.endereco_texto || "Local a ser definido"
+              },
+              setorNome
+            );
+            
+            if (res.success) {
+              emailsEnviados++;
+            } else {
+              console.error(`Erro ao enviar e-mail para ${staff.email}:`, res.error);
+            }
+          } else {
+            staffsSemEmail++;
+          }
+
         } else if (staff.estaEmOutroSetor) {
+          // Apenas atualiza o setor se ele já estava alocado antes
           await supabase.from('escalas').update({ setor: setorNome }).eq('id', staff.escalaId);
         }
       }
 
+      // Dá o feedback claro para o usuário sobre os envios
+      alert(`Setor salvo com sucesso!\n\n📧 E-mails de notificação enviados: ${emailsEnviados}\n⚠️ Staffs novos sem e-mail cadastrado: ${staffsSemEmail}`);
+      
       router.push(`/admin/eventos/${eventoId}/escalar`);
     } catch (error) {
       console.error(error);
@@ -123,7 +172,7 @@ function AlocarEquipeConteudo() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#171717] flex flex-col items-center justify-center text-[#777]">
-        <Loader2 className="animate-spin mb-4 text-[#16a34a]" size={40} />
+        <Loader2 className="animate-spin mb-4 text-[#2563eb]" size={40} />
         <p>Buscando staff disponível...</p>
       </div>
     );
@@ -199,7 +248,7 @@ function AlocarEquipeConteudo() {
 
 export default function AlocarEquipe() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#171717] flex flex-col items-center justify-center text-[#777]"><Loader2 className="animate-spin mb-4 text-[#16a34a]" size={40} /><p>Preparando painel...</p></div>}>
+    <Suspense fallback={<div className="min-h-screen bg-[#171717] flex flex-col items-center justify-center text-[#777]"><Loader2 className="animate-spin mb-4 text-[#2563eb]" size={40} /><p>Preparando painel...</p></div>}>
       <AlocarEquipeConteudo />
     </Suspense>
   );
