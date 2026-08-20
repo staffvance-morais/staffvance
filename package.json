@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@netlify/plugin-nextjs": "^5.15.13",
     "@supabase/supabase-js": "^2.110.5",
     "browser-image-compression": "^2.0.2",
     "leaflet": "^1.9.4",
