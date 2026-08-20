@@ -1,6 +1,8 @@
 "use client";
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
 import { 
   Home, 
   Users, 
@@ -10,9 +12,58 @@ import {
   ChevronDown 
 } from "lucide-react";
 
+// Conectando com o Supabase usando as chaves do Netlify
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+
 export default function PainelCoordenadora() {
   const router = useRouter();
   const [menuAberto, setMenuAberto] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState(false); // Trava de segurança
+
+  // ==========================================
+  // TRAVA DE SEGURANÇA: Verifica o cargo (role)
+  // ==========================================
+  useEffect(() => {
+    async function checkSecurity() {
+      // 1. Pega quem é o usuário logado
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push("/"); // Não está logado? Volta pro início.
+        return;
+      }
+
+      // 2. Consulta a tabela de perfis
+      const { data: perfil } = await supabase
+        .from("perfis")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      // 3. O Julgamento: É coordenador ou admin?
+      if (!perfil || (perfil.role !== "coordenador" && perfil.role !== "admin")) {
+        // Se for freelancer, chuta pra fora
+        router.push("/freelancers");
+      } else {
+        // Se tiver permissão, destranca a tela
+        setIsAuthorized(true);
+      }
+    }
+
+    checkSecurity();
+  }, [router]);
+
+  // Tela de carregamento anti-flicker (evita que a tela pisque antes de bloquear)
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-[#141414] flex items-center justify-center">
+        <span className="text-gray-500 font-medium animate-pulse">Verificando credenciais...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#141414] text-gray-300 font-sans flex flex-col relative overflow-hidden">
