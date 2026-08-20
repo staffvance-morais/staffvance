@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
 import { 
   Home, 
   Menu, 
@@ -13,9 +14,59 @@ import {
   ChevronDown
 } from "lucide-react";
 
+// Conectando com o Supabase usando as chaves seguras do Netlify
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+
 export default function AdminPage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState(false); // Nova trava de segurança
   const router = useRouter();
+
+  // ==========================================
+  // TRAVA DE SEGURANÇA: Verifica o cargo (role)
+  // ==========================================
+  useEffect(() => {
+    async function checkSecurity() {
+      // 1. Pega quem é o usuário logado agora
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push("/"); // Não tem ninguém logado? Vai pro login.
+        return;
+      }
+
+      // 2. Procura na tabela 'perfis' qual é o cargo desse usuário
+      const { data: perfil } = await supabase
+        .from("perfis")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      // 3. O Julgamento: É admin?
+      if (!perfil || perfil.role !== "admin") {
+        // Se for freelancer ou não tiver cargo, é expulso imediatamente!
+        router.push("/freelancers");
+      } else {
+        // Se for admin verdadeiro, destranca a tela
+        setIsAuthorized(true);
+      }
+    }
+
+    checkSecurity();
+  }, [router]);
+
+  // Enquanto o sistema vai no banco checar o crachá, a tela fica preta
+  // Isso impede que o invasor veja o visual da página por meio segundo
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-[#111111] flex items-center justify-center">
+        <span className="text-gray-500 font-medium animate-pulse">Verificando credenciais...</span>
+      </div>
+    );
+  }
 
   // ==========================================
   // TELA 2: MENU ABERTO
