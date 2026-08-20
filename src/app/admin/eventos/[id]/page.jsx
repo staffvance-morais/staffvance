@@ -201,7 +201,8 @@ export default function DetalhesEvento() {
             {/* BOTÃO INTELIGENTE DO MAPA TÁTICO (Só aparece se o evento for no Presidente Vargas) */}
             {possuiMapaTatico && (
               <div 
-                onClick={() => router.push(`/admin/mapa?evento=${eventoId}`)}
+                // ======= A CORREÇÃO FOI FEITA AQUI NESTA LINHA ABAIXO =======
+                onClick={() => router.push(`/mapa?evento=${eventoId}`)}
                 className="bg-[#2a2a2a] border border-[#16a34a]/40 hover:border-[#16a34a] p-4 rounded-sm flex items-center justify-between cursor-pointer transition-colors group shadow-md"
               >
                 <div className="flex items-center gap-3">
