@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import { 
   Home, 
   Menu, 
@@ -14,15 +13,12 @@ import {
   ChevronDown
 } from "lucide-react";
 
-// Conectando com o Supabase usando as chaves seguras do Netlify
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+// Conexão centralizada (Resolve o bug de login no Netlify)
+import { supabase } from '@/lib/supabase';
 
 export default function AdminPage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isAuthorized, setIsAuthorized] = useState(false); // Nova trava de segurança
+  const [isAuthorized, setIsAuthorized] = useState(false); 
   const router = useRouter();
 
   // ==========================================
@@ -59,7 +55,6 @@ export default function AdminPage() {
   }, [router]);
 
   // Enquanto o sistema vai no banco checar o crachá, a tela fica preta
-  // Isso impede que o invasor veja o visual da página por meio segundo
   if (!isAuthorized) {
     return (
       <div className="min-h-screen bg-[#111111] flex items-center justify-center">
@@ -99,7 +94,6 @@ export default function AdminPage() {
             <span className="text-gray-200 text-lg">Página inicial</span>
           </button>
 
-          {/* Botão Equipe configurado com a rota */}
           <button 
              onClick={() => router.push("/admin/funcionarios")}
             className="border border-[#333] bg-[#1a1a1a] flex items-center gap-4 p-4 hover:bg-[#222] transition-colors text-left cursor-pointer w-full"
@@ -108,7 +102,6 @@ export default function AdminPage() {
             <span className="text-gray-200 text-lg">Equipe</span>
           </button>
 
-          {/* O SEU CLIQUE DE CLIENTES FOI ADICIONADO AQUI */}
           <button 
             onClick={() => router.push("/admin/clientes")}
             className="border border-[#333] bg-[#1a1a1a] flex items-center gap-4 p-4 hover:bg-[#222] transition-colors text-left cursor-pointer w-full"
@@ -117,7 +110,6 @@ export default function AdminPage() {
             <span className="text-gray-200 text-lg">Clientes</span>
           </button>
 
-          {/* O CLIQUE DE EVENTOS FOI ADICIONADO AQUI */}
           <button 
             onClick={() => router.push("/admin/eventos")}
             className="border border-[#333] bg-[#1a1a1a] flex items-center gap-4 p-4 hover:bg-[#222] transition-colors text-left cursor-pointer w-full"
@@ -126,7 +118,6 @@ export default function AdminPage() {
             <span className="text-gray-200 text-lg">Eventos</span>
           </button>
 
-          {/* O CLIQUE DO FINANCEIRO FOI ADICIONADO AQUI */}
           <button 
             onClick={() => router.push("/admin/financeiro")}
             className="border border-[#333] bg-[#1a1a1a] flex items-center gap-4 p-4 hover:bg-[#222] transition-colors text-left cursor-pointer w-full"
@@ -160,7 +151,7 @@ export default function AdminPage() {
   }
 
   // ==========================================
-  // TELA 1: PÁGINA INICIAL (Em Desenvolvimento)
+  // TELA 1: PÁGINA INICIAL
   // ==========================================
   return (
     <div className="min-h-screen bg-[#111111] text-gray-400 font-sans flex flex-col relative pb-24">
@@ -173,7 +164,7 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Centro (Em desenvolvimento) */}
+      {/* Centro */}
       <div className="flex-1 flex items-center justify-center">
         <p className="text-[#666] text-lg font-medium">Em desenvolvimento</p>
       </div>

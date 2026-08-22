@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import { 
   Home, 
   Users, 
@@ -12,16 +11,13 @@ import {
   ChevronDown 
 } from "lucide-react";
 
-// Conectando com o Supabase usando as chaves do Netlify
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+// Conexão centralizada (Resolve o bug de login no Netlify)
+import { supabase } from '@/lib/supabase';
 
 export default function PainelCoordenadora() {
   const router = useRouter();
   const [menuAberto, setMenuAberto] = useState(false);
-  const [isAuthorized, setIsAuthorized] = useState(false); // Trava de segurança
+  const [isAuthorized, setIsAuthorized] = useState(false); 
 
   // ==========================================
   // TRAVA DE SEGURANÇA: Verifica o cargo (role)
@@ -56,7 +52,7 @@ export default function PainelCoordenadora() {
     checkSecurity();
   }, [router]);
 
-  // Tela de carregamento anti-flicker (evita que a tela pisque antes de bloquear)
+  // Tela de carregamento anti-flicker
   if (!isAuthorized) {
     return (
       <div className="min-h-screen bg-[#141414] flex items-center justify-center">
@@ -135,7 +131,6 @@ export default function PainelCoordenadora() {
               <span>Equipe</span>
             </button>
 
-            {/* AQUI ESTÁ A CORREÇÃO DO LINK DE EVENTOS */}
             <button 
               onClick={() => router.push("/coordenador/eventos")}
               className="w-full border border-[#333] bg-[#1e1e1e] p-4 flex items-center gap-4 text-gray-300 text-lg hover:bg-[#2a2a2a] transition-colors rounded-sm"
