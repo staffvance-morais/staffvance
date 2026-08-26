@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import HeaderSuperior from "@/components/HeaderSuperior";
 import { 
   Contact2, 
   ChevronRight,
@@ -130,11 +131,8 @@ export default function CadastrarFuncionario() {
       )}
 
       {/* Cabeçalho */}
-      <div className="px-5 py-5 flex items-center gap-2 border-b border-[#333]">
-        <Contact2 size={20} className="text-gray-400" strokeWidth={1.5} />
-        <span className="text-gray-400 text-sm">Equipe</span>
-        <ChevronRight size={16} className="text-gray-500" />
-        <span className="text-gray-200 text-sm font-medium">Cadastrar funcionário</span>
+      <div className="px-5 pt-5">
+        <HeaderSuperior />
       </div>
 
       <div className="p-5 flex-1 overflow-y-auto">

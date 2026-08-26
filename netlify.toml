@@ -2,8 +2,20 @@
   command = "npm run build"
   publish = ".next"
 
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
 [build.environment]
   NODE_VERSION = "20"
 
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
+[[redirects]]
+  from = "https://wadjet.seg.br/*"
+  to = "https://gerenciador.wadjet.seg.br/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "http://wadjet.seg.br/*"
+  to = "https://gerenciador.wadjet.seg.br/:splat"
+  status = 301
+  force = true

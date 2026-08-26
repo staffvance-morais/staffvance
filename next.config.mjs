@@ -24,8 +24,10 @@ const nextConfig = {
           {
             // A famosa CSP (Relatório pediu para mitigar XSS)
             // Libera o próprio site e o Supabase. Bloqueia o resto.
+            // Libera o próprio site, Supabase e Google ReCAPTCHA. Bloqueia o resto.
             key: 'Content-Security-Policy',
             value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co; frame-ancestors 'none';",
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/; frame-src 'self' https://www.google.com https://recaptcha.google.com https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://www.google.com/recaptcha/ https://recaptcha.google.com/; frame-ancestors 'none';",
           }
         ],
       },
