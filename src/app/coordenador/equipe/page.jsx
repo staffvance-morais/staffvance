@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
+import HeaderSuperior from "@/components/HeaderSuperior";
 import { Search, Info, Plus, Filter, ChevronUp, Menu, Users, User } from "lucide-react"; // Importei o ícone User aqui
 
 // Configuração do Supabase
@@ -59,12 +60,8 @@ export default function EquipeCoordenador() {
     <div className="min-h-screen bg-[#141414] text-gray-300 font-sans flex flex-col relative pb-48">
       
       {/* Cabeçalho */}
-      <div className="p-4 flex flex-col pt-6">
-        <div className="flex items-center gap-3 mb-3">
-          <Users size={22} className="text-gray-400" strokeWidth={1.5} />
-          <span className="text-gray-300 text-base tracking-wide">Equipe</span>
-        </div>
-        <div className="w-full h-px bg-[#333]"></div>
+      <div className="p-4 pt-6">
+        <HeaderSuperior />
       </div>
 
       {/* Área de Pesquisa e Lista */}

@@ -9,6 +9,7 @@
 
 # Local environment variables
 .env*.local
+.env
 
 # Logs
 npm-debug.log*

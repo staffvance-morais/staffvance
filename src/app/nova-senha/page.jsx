@@ -1,3 +1,5 @@
+// NOVA SENHA - PÁGINA FINALIZADA
+
 "use client";
 
 import { useState } from "react";
@@ -6,16 +8,15 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { LockKeyhole } from "lucide-react";
 
-// Componentes reutilizáveis
-import Alert from "../components/Alert";
-import AuthLayout from "../components/AuthLayout";
-import AuthCard from "../components/AuthCard";
-import Divider from "../components/Divider";
-import AuthHeader from "../components/AuthHeader";
-import AuthTitle from "../components/AuthTitle";
-import AuthSubtitle from "../components/AuthSubtitle";
-import FormInput from "../components/FormInput";
-import SolidButton from "../components/SolidButton";
+import Alert from "@/components/Alert";
+import AuthLayout from "@/components/AuthLayout";
+import AuthCard from "@/components/AuthCard";
+import Divider from "@/components/Divider";
+import AuthHeader from "@/components/AuthHeader";
+import AuthTitle from "@/components/AuthTitle";
+import AuthSubtitle from "@/components/AuthSubtitle";
+import FormInput from "@/components/FormInput";
+import SolidButton from "@/components/SolidButton";
 
 export default function NovaSenha() {
   const router = useRouter();
@@ -31,7 +32,6 @@ export default function NovaSenha() {
     setErro("");
 
     try {
-      // O Supabase já sabe quem é o usuário por causa do link seguro que ele clicou no e-mail
       const { error } = await supabase.auth.updateUser({
         password: senha,
       });
@@ -40,24 +40,21 @@ export default function NovaSenha() {
 
       setMensagem("Senha atualizada com sucesso!");
 
-      // Espera 2 segundinhos para a pessoa ler a mensagem de sucesso e manda pro Login
       setTimeout(() => {
         router.push("/");
       }, 2000);
     } catch (error) {
-      console.error("Erro ao atualizar senha:", error);
       setErro(
-        "Houve um erro ao atualizar a senha. Tente solicitar o link novamente.",
+        "Houve um erro ao atualizar a senha. Tente solicitar o link novamente."
       );
-    } finally {
       setLoading(false);
     }
   };
 
   return (
     <AuthLayout>
-      <Alert variant="error">{erro}</Alert>
-      <Alert variant="success">{mensagem}</Alert>
+      <Alert variant="error" className="mb-6">{erro}</Alert>
+      <Alert variant="success" className="mb-6">{mensagem}</Alert>
 
       <AuthCard>
         <Image
@@ -91,6 +88,7 @@ export default function NovaSenha() {
             placeholder="Nova senha"
             required
             minLength={6}
+            autoComplete="new-password"
           />
 
           <SolidButton

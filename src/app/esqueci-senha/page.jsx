@@ -1,3 +1,5 @@
+// ESQUECI SENHA - PÁGINA FINALIZADA
+
 "use client";
 
 import { useState } from "react";
@@ -5,18 +7,17 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Mail } from "lucide-react";
-import ReCAPTCHA from "react-google-recaptcha"; // <-- Importação do reCAPTCHA
+import ReCAPTCHA from "react-google-recaptcha";
 
-// Componentes reutilizáveis
-import Alert from "../components/Alert";
-import AuthLayout from "../components/AuthLayout";
-import AuthCard from "../components/AuthCard";
-import Divider from "../components/Divider";
-import AuthHeader from "../components/AuthHeader";
-import AuthTitle from "../components/AuthTitle";
-import AuthSubtitle from "../components/AuthSubtitle";
-import FormInput from "../components/FormInput";
-import SolidButton from "../components/SolidButton";
+import Alert from "@/components/Alert";
+import AuthLayout from "@/components/AuthLayout";
+import AuthCard from "@/components/AuthCard";
+import Divider from "@/components/Divider";
+import AuthHeader from "@/components/AuthHeader";
+import AuthTitle from "@/components/AuthTitle";
+import AuthSubtitle from "@/components/AuthSubtitle";
+import FormInput from "@/components/FormInput";
+import SolidButton from "@/components/SolidButton";
 
 export default function EsqueciSenha() {
   const router = useRouter();
@@ -24,8 +25,6 @@ export default function EsqueciSenha() {
   const [loading, setLoading] = useState(false);
   const [mensagem, setMensagem] = useState("");
   const [erro, setErro] = useState("");
-  
-  // Estado para controlar se o usuário marcou a caixinha do Google
   const [captchaValido, setCaptchaValido] = useState(false);
 
   const handleRecuperarSenha = async (e) => {
@@ -34,16 +33,13 @@ export default function EsqueciSenha() {
     setMensagem("");
     setErro("");
 
-    // 1. TRAVA DE SEGURANÇA DO ROBÔ
     if (!captchaValido) {
-      setErro("Por favor, confirme que você não é um robô marcando a caixa abaixo.");
+      setErro("Por favor, confirme que você não é um robô.");
       setLoading(false);
       return;
     }
 
     try {
-      // O Supabase envia um e-mail com um link seguro.
-      // O redirectTo é para onde o usuário volta após clicar no link do e-mail.
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/nova-senha`,
       });
@@ -54,17 +50,17 @@ export default function EsqueciSenha() {
         "Link de recuperação enviado! Verifique sua caixa de entrada ou spam.",
       );
     } catch (error) {
-      console.error("Erro ao recuperar senha:", error);
-      setErro("Não foi possível enviar o e-mail. Verifique se o endereço está correto.");
-    } finally {
+      setErro(
+        "Não foi possível enviar o e-mail. Verifique se o endereço está correto."
+      );
       setLoading(false);
     }
   };
 
   return (
     <AuthLayout>
-      <Alert variant="error">{erro}</Alert>
-      <Alert variant="success">{mensagem}</Alert>
+      <Alert variant="error" className="mb-6">{erro}</Alert>
+      <Alert variant="success" className="mb-6">{mensagem}</Alert>
 
       <AuthCard>
         <Image
@@ -94,10 +90,10 @@ export default function EsqueciSenha() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="E-mail"
             required
+            autoComplete="email"
           />
 
-          {/* COMPONENTE DO GOOGLE RECAPTCHA (TEMA ESCURO) */}
-          <div className="flex justify-center w-full my-2 overflow-hidden rounded-md">
+          <div className="flex justify-center w-full overflow-hidden">
             <ReCAPTCHA
               sitekey={process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}
               onChange={(valor) => setCaptchaValido(!!valor)}
@@ -113,7 +109,7 @@ export default function EsqueciSenha() {
             {loading ? "Enviando..." : "Enviar link"}
           </SolidButton>
 
-        <Divider />
+          <Divider />
 
           <SolidButton
             type="button"
