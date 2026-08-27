@@ -23,14 +23,21 @@ const supabase = createClient(
 // ==========================================
 // COMPONENTE: CARD DO CLIENTE
 // ==========================================
-const ClienteCard = ({ nome, representante, foto, selected }) => {
+const ClienteCard = ({ id, nome, representante, foto, selected, router }) => {
+  const [imgError, setImgError] = useState(false);
+
   return (
     <div className="border border-[#3a3a3a] bg-[#222222] flex p-3 mb-3 rounded-sm relative">
       
       {/* Imagem do Cliente com Checkbox sobreposto */}
       <div className="w-[70px] h-[70px] bg-[#1a1a1a] mr-4 shrink-0 relative border border-[#444]">
-        {foto ? (
-          <img src={foto} alt={nome} className="w-full h-full object-cover" />
+        {foto && !imgError ? (
+          <img 
+            src={foto} 
+            alt={nome} 
+            className="w-full h-full object-cover" 
+            onError={() => setImgError(true)} 
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-[10px] text-[#666] text-center p-1">Sem Imagem</div>
         )}
@@ -48,8 +55,14 @@ const ClienteCard = ({ nome, representante, foto, selected }) => {
           <p className="text-[#999999] text-[14px] mt-1">{representante}</p>
         </div>
         
-        {/* Botão de Info */}
-        <button className="w-9 h-9 border border-[#444] rounded-sm bg-[#2a2a2a] flex items-center justify-center text-[#999] hover:bg-[#333] transition-colors cursor-pointer">
+        {/* Botão de Info com FORÇAMENTO DE ROTA (Seguro e funcional) */}
+        <button 
+          onClick={(e) => {
+            e.preventDefault(); 
+            router.push(`/admin/clientes/${id}`);
+          }}
+          className="w-9 h-9 border border-[#444] rounded-sm bg-[#2a2a2a] flex items-center justify-center text-[#999] hover:bg-[#333] transition-colors cursor-pointer z-10"
+        >
           <Info size={20} strokeWidth={1.5} />
         </button>
       </div>
@@ -61,7 +74,7 @@ const ClienteCard = ({ nome, representante, foto, selected }) => {
 // PÁGINA PRINCIPAL: CLIENTES
 // ==========================================
 export default function PainelClientes() {
-  const router = useRouter(); // Roteador para fazer o botão Voltar funcionar
+  const router = useRouter(); 
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState("");
@@ -69,7 +82,6 @@ export default function PainelClientes() {
   useEffect(() => {
     const fetchClientes = async () => {
       try {
-        // Busca os clientes na tabela do Supabase
         const { data, error } = await supabase
           .from('clientes')
           .select('*')
@@ -84,11 +96,10 @@ export default function PainelClientes() {
         if (data) {
           const clientesFormatados = data.map(cli => ({
             id: cli.id,
-            nome: cli.nome || "Cliente sem nome",
-            // Ajuste o campo 'representante' para o nome da coluna que você usa no banco
-            representante: cli.representante || cli.nome_fantasia || "Sem representante", 
-            foto: cli.foto_url || cli.logo_url || null,
-            selected: false // Deixando desmarcado por padrão
+            nome: cli.empresa || "Empresa não informada",
+            representante: cli.representante || "Sem representante", 
+            foto: (cli.foto_url && cli.foto_url.trim() !== "") ? cli.foto_url : null,
+            selected: false 
           }));
           setClientes(clientesFormatados);
         }
@@ -102,7 +113,6 @@ export default function PainelClientes() {
     fetchClientes();
   }, []);
 
-  // Filtro da barra de pesquisa
   const clientesFiltrados = clientes.filter(cli => 
     cli.nome.toLowerCase().includes(busca.toLowerCase()) ||
     cli.representante.toLowerCase().includes(busca.toLowerCase())
@@ -111,7 +121,6 @@ export default function PainelClientes() {
   return (
     <div className="min-h-screen bg-[#171717] font-sans flex flex-col items-center justify-center">
       
-      {/* Container Principal */}
       <div className="w-full max-w-[400px] h-[100dvh] flex flex-col p-4 bg-[#171717] relative">
         
         {/* CABEÇALHO */}
@@ -152,10 +161,12 @@ export default function PainelClientes() {
             clientesFiltrados.map((cli) => (
               <ClienteCard 
                 key={cli.id}
+                id={cli.id}
                 nome={cli.nome}
                 representante={cli.representante}
                 foto={cli.foto}
                 selected={cli.selected}
+                router={router}
               />
             ))
           )}
@@ -164,7 +175,6 @@ export default function PainelClientes() {
         {/* ÁREA INFERIOR FIXA (BOTÕES E MENU) */}
         <div className="shrink-0 pt-2 flex flex-col gap-3 bg-[#171717]">
           
-          {/* Botão de Cadastrar com Link configurado */}
           <Link 
             href="/admin/clientes/cadastrar"
             className="w-full bg-[#2563eb] hover:bg-[#1d4ed8] text-white flex items-center justify-center font-semibold py-4 text-[18px] tracking-wide rounded-sm transition-colors shadow-sm cursor-pointer"
@@ -172,7 +182,6 @@ export default function PainelClientes() {
             Cadastrar cliente
           </Link>
 
-          {/* Botão Mais Opções */}
           <button className="w-full bg-[#2a2a2a] border border-[#3a3a3a] hover:bg-[#333] text-[#a3a3a3] py-[14px] flex items-center justify-between px-4 rounded-sm transition-colors cursor-pointer">
             <div className="flex items-center gap-3 text-[17px] tracking-wide">
               <Filter size={22} strokeWidth={1.5} /> Mais opções...
@@ -182,9 +191,6 @@ export default function PainelClientes() {
             </div>
           </button>
 
-          {/* ==================================================
-              RODAPÉ ATUALIZADO: BOTÃO MENU COM REDIRECIONAMENTO
-              ================================================== */}
           <div className="flex items-stretch justify-between border border-[#3a3a3a] bg-[#1a1a1a] rounded-sm overflow-hidden h-[60px]">
             <div className="w-16 flex items-center justify-center opacity-30">
               <img 

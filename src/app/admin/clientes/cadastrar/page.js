@@ -33,7 +33,8 @@ export default function CadastrarCliente() {
     if (!file) return;
     setComprimindo(true);
 
-    const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1024, useWebWorker: true };
+    // MODIFICAÇÃO AQUI: useWebWorker alterado para false para evitar o bloqueio de segurança (CSP)
+    const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1024, useWebWorker: false };
 
     try {
       const compressedFile = await imageCompression(file, options);
