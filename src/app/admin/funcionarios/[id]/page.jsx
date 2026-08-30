@@ -2,7 +2,21 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
-import { ArrowLeft, User, Phone, Edit3, Save, Loader2, Award, FileText } from "lucide-react";
+import { 
+  ArrowLeft, 
+  User, 
+  Phone, 
+  Edit3, 
+  Save, 
+  Loader2, 
+  Award, 
+  FileText,
+  Landmark,
+  CalendarFold,
+  Wallet,
+  GraduationCap,
+  Shirt
+} from "lucide-react";
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
@@ -39,6 +53,16 @@ export default function PerfilDetalhado() {
       setPerfil(prev => ({ ...prev, classificacao, anotacoes }));
       setEditMode(false);
     } catch (error) { alert("Erro ao salvar"); } finally { setSalvando(false); }
+  };
+
+  // Função para formatar a data do banco (AAAA-MM-DD) para (DD/MM/AAAA) visualmente
+  const formatarData = (dataStr) => {
+    if (!dataStr) return 'Não informada';
+    if (dataStr.includes('-')) {
+      const partes = dataStr.split('-');
+      if (partes.length === 3) return `${partes[2]}/${partes[1]}/${partes[0]}`;
+    }
+    return dataStr;
   };
 
   if (loading) return <div className="min-h-screen bg-[#111] flex items-center justify-center text-white"><Loader2 className="animate-spin" /></div>;
@@ -78,10 +102,55 @@ export default function PerfilDetalhado() {
           </div>
 
           <div className="bg-[#222] border border-[#333] rounded-md p-4 mb-3 flex items-center gap-4">
+            <Landmark className="text-[#666]" size={20} />
+            <div>
+              <p className="text-[#999] text-[12px]">CPF</p>
+              <p className="text-[#e5e5e5]">{perfil?.cpf || 'Não informado'}</p>
+            </div>
+          </div>
+
+          <div className="bg-[#222] border border-[#333] rounded-md p-4 mb-3 flex items-center gap-4">
+            <CalendarFold className="text-[#666]" size={20} />
+            <div>
+              <p className="text-[#999] text-[12px]">Data de Nascimento</p>
+              <p className="text-[#e5e5e5]">{formatarData(perfil?.data_nascimento)}</p>
+            </div>
+          </div>
+
+          <div className="bg-[#222] border border-[#333] rounded-md p-4 mb-3 flex items-center gap-4">
             <Phone className="text-[#666]" size={20} />
             <div>
               <p className="text-[#999] text-[12px]">WhatsApp</p>
               <p className="text-[#e5e5e5]">{perfil?.whatsapp || 'Não informado'}</p>
+            </div>
+          </div>
+
+          <div className="bg-[#222] border border-[#333] rounded-md p-4 mb-3 flex items-center gap-4">
+            <Wallet className="text-[#666]" size={20} />
+            <div className="overflow-hidden">
+              <p className="text-[#999] text-[12px]">Chave Pix</p>
+              <p className="text-[#e5e5e5] truncate">{perfil?.chave_pix || 'Não informada'}</p>
+            </div>
+          </div>
+
+          <div className="bg-[#222] border border-[#333] rounded-md p-4 mb-3 flex items-center gap-4">
+            <GraduationCap className="text-[#666]" size={20} />
+            <div>
+              <p className="text-[#999] text-[12px]">Curso de Segurança</p>
+              <p className="text-[#e5e5e5]">
+                {perfil?.curso === 'nenhum' ? 'Não possui' :
+                 perfil?.curso === 'apoio' ? 'Apoio e Segurança em Eventos' :
+                 perfil?.curso === 'extensao' ? 'Extensão para Grandes Eventos' :
+                 (perfil?.curso || 'Não informado')}
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-[#222] border border-[#333] rounded-md p-4 mb-3 flex items-center gap-4">
+            <Shirt className="text-[#666]" size={20} />
+            <div>
+              <p className="text-[#999] text-[12px]">Tamanho do Uniforme</p>
+              <p className="text-[#e5e5e5] uppercase">{perfil?.uniforme || 'Não informado'}</p>
             </div>
           </div>
 

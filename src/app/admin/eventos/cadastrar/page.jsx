@@ -14,7 +14,8 @@ import {
   Clock,
   ImagePlus,
   Menu,
-  Loader2
+  Loader2,
+  Image as ImageIcon
 } from "lucide-react";
 
 // Conexão com o Supabase
@@ -25,12 +26,61 @@ const supabase = createClient(
 
 const STORAGE_BUCKET = "eventos-fotos";
 
+// ==========================================
+// FUNÇÃO DE COMPRESSÃO DE IMAGEM
+// ==========================================
+const compactarImagem = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob(
+          (blob) => {
+            const compressedFile = new File([blob], file.name, {
+              type: "image/jpeg",
+              lastModified: Date.now(),
+            });
+            resolve(compressedFile);
+          },
+          "image/jpeg",
+          0.7 
+        );
+      };
+    };
+    reader.onerror = (error) => reject(error);
+  });
+};
+
 export default function CadastrarEvento() {
   const router = useRouter();
   const fileInputRef = useRef(null);
 
   const [salvando, setSalvando] = useState(false);
-  const [enviandoFoto, setEnviandoFoto] = useState(false);
 
   // Estados dos campos principais
   const [titulo, setTitulo] = useState("");
@@ -40,6 +90,11 @@ export default function CadastrarEvento() {
   const [horaInicio, setHoraInicio] = useState("");
   const [horaTermino, setHoraTermino] = useState("");
 
+  // Estados da Capa do Evento
+  const [fotoPreview, setFotoPreview] = useState("");
+  const [fotoUpload, setFotoUpload] = useState(null);
+  const [comprimindo, setComprimindo] = useState(false);
+
   // Estados dos Menus Expansíveis
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
@@ -47,7 +102,6 @@ export default function CadastrarEvento() {
   // Estados da Localização
   const [localSelecionado, setLocalSelecionado] = useState("");
   const [customLocalName, setCustomLocalName] = useState("");
-  const [customLocalImage, setCustomLocalImage] = useState("");
 
   // Estados Dinâmicos do Banco
   const [clientes, setClientes] = useState([]);
@@ -105,7 +159,7 @@ export default function CadastrarEvento() {
   };
 
   // ----------------------------------------------------
-  // BUSCA LOCAIS DINÂMICOS (Com Filtro Anti-Duplicata Inteligente)
+  // BUSCA LOCAIS DINÂMICOS
   // ----------------------------------------------------
   useEffect(() => {
     if (showLocationDropdown && locais.length === locaisDeFabrica.length) {
@@ -119,26 +173,22 @@ export default function CadastrarEvento() {
       const { data, error } = await supabase.from("eventos").select("endereco_texto");
 
       if (data && !error) {
-        // 1. Pega todos os nomes e remove espaços extras nas pontas
         const todosNomes = data.map((e) => e.endereco_texto?.trim()).filter(Boolean);
-        
-        // 2. Remove duplicatas ignorando letras maiúsculas/minúsculas
         const locaisMap = new Map();
+        
         todosNomes.forEach(nome => {
           const key = nome.toLowerCase();
           if (!locaisMap.has(key)) {
-            locaisMap.set(key, nome); // Guarda a versão original (ex: "Arena Castelão")
+            locaisMap.set(key, nome);
           }
         });
         const nomesUnicos = Array.from(locaisMap.values());
 
-        // 3. Filtra garantindo que não vai repetir nenhum da lista de fábrica
         const nomesNovos = nomesUnicos.filter((novoNome) => {
           const novoNomeLower = novoNome.toLowerCase();
           return !locaisDeFabrica.some((fabrica) => fabrica.nome.toLowerCase() === novoNomeLower);
         });
 
-        // 4. Adiciona à lista final
         const locaisExtras = nomesNovos.map((nome) => ({ nome: nome, tatico: false }));
         setLocais([...locaisDeFabrica, ...locaisExtras]);
       }
@@ -150,51 +200,84 @@ export default function CadastrarEvento() {
   };
 
   // ----------------------------------------------------
-  // UPLOAD DA FOTO DO LOCAL
+  // MANIPULAÇÃO DA CAPA DO EVENTO E MÁSCARAS
   // ----------------------------------------------------
+  const selecionarFotoPublic = (caminho) => {
+    setFotoPreview(caminho);
+    setFotoUpload(null); 
+  };
+
   const handleUploadFoto = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setEnviandoFoto(true);
+    setComprimindo(true);
     try {
-      const extensao = file.name.split(".").pop();
-      const nomeArquivo = `locais/${Date.now()}.${extensao}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(nomeArquivo, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: publicUrlData } = supabase.storage
-        .from(STORAGE_BUCKET)
-        .getPublicUrl(nomeArquivo);
-
-      setCustomLocalImage(publicUrlData.publicUrl);
+      const arquivoComprimido = await compactarImagem(file);
+      setFotoUpload(arquivoComprimido);
+      setFotoPreview(URL.createObjectURL(arquivoComprimido)); 
     } catch (error) {
-      console.error(error);
-      alert("Erro ao enviar imagem. Verifique se o bucket 'eventos-fotos' existe no Supabase.");
+      console.error("Erro na compactação:", error);
+      alert("Erro ao processar a imagem.");
     } finally {
-      setEnviandoFoto(false);
+      setComprimindo(false);
     }
+  };
+
+  const formatarData = (valor) => {
+    return valor
+      .replace(/\D/g, "") 
+      .replace(/(\d{2})(\d)/, "$1/$2") 
+      .replace(/(\d{2})(\d)/, "$1/$2") 
+      .replace(/(\d{4})\d+?$/, "$1");
+  };
+
+  const formatarHora = (valor) => {
+    return valor
+      .replace(/\D/g, "")
+      .replace(/(\d{2})(\d)/, "$1:$2")
+      .replace(/(\d{2})\d+?$/, "$1");
   };
 
   // ----------------------------------------------------
   // SALVAR NOVO EVENTO
   // ----------------------------------------------------
   const handleSalvar = async () => {
-    if (!titulo || !dataOperacao || !horaInicio) {
-      alert("Preencha pelo menos o Título, Data e Início da operação.");
+    // Validação de preenchimento correto
+    if (!titulo || dataOperacao.length !== 10 || horaInicio.length !== 5) {
+      alert("Preencha o Título, Data da operação (DD/MM/AAAA) e Início (HH:MM) corretamente.");
       return;
     }
 
     setSalvando(true);
 
     try {
-      const dataInicioCompleta = new Date(`${dataOperacao}T${horaInicio}:00`).toISOString();
-      const dataFimCompleta = horaTermino ? new Date(`${dataOperacao}T${horaTermino}:00`).toISOString() : null;
+      let urlFinalDaFoto = fotoPreview; 
 
+      if (fotoUpload) {
+        const extensao = fotoUpload.name.split(".").pop() || "jpg";
+        const nomeArquivo = `capas/${Date.now()}.${extensao}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .upload(nomeArquivo, fotoUpload, { upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from(STORAGE_BUCKET)
+          .getPublicUrl(nomeArquivo);
+
+        urlFinalDaFoto = publicUrlData.publicUrl;
+      }
+
+      // Converte DD/MM/AAAA para AAAA-MM-DD para o banco de dados
+      const [dia, mes, ano] = dataOperacao.split("/");
+      const dataIso = `${ano}-${mes}-${dia}`;
+
+      const dataInicioCompleta = new Date(`${dataIso}T${horaInicio}:00`).toISOString();
+      const dataFimCompleta = horaTermino?.length === 5 ? new Date(`${dataIso}T${horaTermino}:00`).toISOString() : null;
+      
       const enderecoFinal = localSelecionado === "Outro (Personalizar)" ? customLocalName : localSelecionado;
       const possuiMapaTatico = localSelecionado === "Estádio Presidente Vargas";
 
@@ -208,7 +291,7 @@ export default function CadastrarEvento() {
             endereco_texto: enderecoFinal,
             data_inicio: dataInicioCompleta,
             data_fim: dataFimCompleta,
-            foto_local: customLocalImage || null,
+            foto_local: urlFinalDaFoto || null,
             mapa_tatico: possuiMapaTatico
           }
         ])
@@ -361,27 +444,9 @@ export default function CadastrarEvento() {
 
                   {localSelecionado === "Outro (Personalizar)" && (
                     <div className="p-3.5 flex flex-col gap-3 bg-[#111111]">
-                      <div className="w-full h-[140px] bg-[#fff] relative rounded-sm overflow-hidden flex items-center justify-center border border-[#444]">
-                        {customLocalImage ? (
-                          <img src={customLocalImage} alt="Local" className="w-full h-full object-cover" />
-                        ) : (
-                          <span className="text-[#ccc] text-[14px]">Sem imagem</span>
-                        )}
-
-                        <input type="file" accept="image/*" ref={fileInputRef} onChange={handleUploadFoto} className="hidden" />
-
-                        <button
-                          onClick={() => fileInputRef.current?.click()}
-                          disabled={enviandoFoto}
-                          className="absolute bottom-0 right-0 bg-[#2563eb] w-12 h-12 flex items-center justify-center text-white cursor-pointer hover:bg-[#1d4ed8] rounded-tl-sm transition-colors"
-                        >
-                          {enviandoFoto ? <Loader2 className="animate-spin" size={20} /> : <ImagePlus size={22} />}
-                        </button>
-                      </div>
-
                       <input
                         type="text"
-                        placeholder="Nome do Local"
+                        placeholder="Nome do Local (Ex: Marina Park)"
                         value={customLocalName}
                         onChange={(e) => setCustomLocalName(e.target.value)}
                         className="bg-[#2a2a2a] border border-[#444] text-[#e5e5e5] p-3 rounded-sm outline-none w-full placeholder:text-[#999] text-[15px]"
@@ -393,67 +458,114 @@ export default function CadastrarEvento() {
             </div>
           </div>
 
-          {/* DATA E HORÁRIO */}
+          {/* CAPA DO EVENTO */}
+          <h2 className="text-[#e5e5e5] text-[18px] font-bold px-4 pt-6 pb-3">Capa do Evento</h2>
+          <div className="mx-4 flex flex-col gap-3">
+            
+            <div className="w-full h-[160px] bg-[#222] border border-[#444] rounded-sm overflow-hidden flex items-center justify-center relative">
+              {comprimindo ? (
+                <div className="flex flex-col items-center text-[#777]">
+                  <Loader2 className="animate-spin mb-2" size={28} />
+                  <span className="text-[13px]">Compactando imagem...</span>
+                </div>
+              ) : fotoPreview ? (
+                <img src={fotoPreview} alt="Capa" className="w-full h-full object-cover" />
+              ) : (
+                <div className="flex flex-col items-center text-[#666]">
+                  <ImageIcon size={36} className="mb-2 opacity-50" />
+                  <span className="text-[13px]">Nenhuma foto selecionada</span>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button 
+                type="button" 
+                onClick={() => selecionarFotoPublic("/Presidente_Vargas_Stadium.jpg")} 
+                className="bg-[#2a2a2a] border border-[#444] hover:bg-[#333] text-[#ccc] font-semibold text-[13px] py-2.5 rounded-sm transition-colors cursor-pointer"
+              >
+                Usar PV
+              </button>
+              
+              <button 
+                type="button" 
+                onClick={() => selecionarFotoPublic("/aecio_de_borba.jpg")} 
+                className="bg-[#2a2a2a] border border-[#444] hover:bg-[#333] text-[#ccc] font-semibold text-[13px] py-2.5 rounded-sm transition-colors cursor-pointer"
+              >
+                Usar Aécio
+              </button>
+              
+              <button 
+                type="button" 
+                onClick={() => fileInputRef.current?.click()} 
+                className="col-span-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-[15px] font-bold py-3 rounded-sm transition-colors flex items-center justify-center gap-2 mt-1 cursor-pointer"
+              >
+                <ImagePlus size={20} />
+                Enviar do dispositivo
+              </button>
+              
+              <input 
+                type="file" 
+                accept="image/*" 
+                ref={fileInputRef} 
+                onChange={handleUploadFoto} 
+                className="hidden" 
+              />
+            </div>
+          </div>
+
+          {/* DATA E HORÁRIO (AGORA COM MÁSCARA LIMPA E PERFEITA) */}
           <h2 className="text-[#e5e5e5] text-[18px] font-bold px-4 pt-6 pb-3">Data e Horário</h2>
 
           <div className="mx-4 flex flex-col bg-[#222222] border border-[#444] rounded-sm">
 
-            <div className="relative flex items-center gap-3 p-3.5 border-b border-[#444]">
+            <div className="flex items-center gap-3 p-3.5 border-b border-[#444]">
               <CalendarDays size={20} className="text-[#777] shrink-0" />
-              {!dataOperacao && (
-                <span className="text-[#999] pointer-events-none absolute left-11 text-[16px]">Data da operação</span>
-              )}
               <input
-                type="date"
+                type="text"
+                placeholder="Data da operação (DD/MM/AAAA)"
+                maxLength={10}
                 value={dataOperacao}
-                onChange={(e) => setDataOperacao(e.target.value)}
-                className={`bg-transparent w-full outline-none text-[16px] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer ${
-                  dataOperacao ? "text-[#e5e5e5]" : "text-transparent"
-                }`}
+                onChange={(e) => setDataOperacao(formatarData(e.target.value))}
+                className="bg-transparent w-full outline-none text-[#e5e5e5] placeholder:text-[#999] text-[16px]"
               />
             </div>
 
-            <div className="relative flex items-center gap-3 p-3.5 border-b border-[#444]">
+            <div className="flex items-center gap-3 p-3.5 border-b border-[#444]">
               <Clock size={20} className="text-[#777] shrink-0" />
-              {!horaInicio && (
-                <span className="text-[#999] pointer-events-none absolute left-11 text-[16px]">Início</span>
-              )}
               <input
-                type="time"
+                type="text"
+                placeholder="Início (HH:MM)"
+                maxLength={5}
                 value={horaInicio}
-                onChange={(e) => setHoraInicio(e.target.value)}
-                className={`bg-transparent w-full outline-none text-[16px] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer ${
-                  horaInicio ? "text-[#e5e5e5]" : "text-transparent"
-                }`}
+                onChange={(e) => setHoraInicio(formatarHora(e.target.value))}
+                className="bg-transparent w-full outline-none text-[#e5e5e5] placeholder:text-[#999] text-[16px]"
               />
             </div>
 
-            <div className="relative flex items-center gap-3 p-3.5">
+            <div className="flex items-center gap-3 p-3.5">
               <Clock size={20} className="text-[#777] rotate-180 shrink-0" />
-              {!horaTermino && (
-                <span className="text-[#999] pointer-events-none absolute left-11 text-[16px]">Término</span>
-              )}
               <input
-                type="time"
+                type="text"
+                placeholder="Término (HH:MM)"
+                maxLength={5}
                 value={horaTermino}
-                onChange={(e) => setHoraTermino(e.target.value)}
-                className={`bg-transparent w-full outline-none text-[16px] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer ${
-                  horaTermino ? "text-[#e5e5e5]" : "text-transparent"
-                }`}
+                onChange={(e) => setHoraTermino(formatarHora(e.target.value))}
+                className="bg-transparent w-full outline-none text-[#e5e5e5] placeholder:text-[#999] text-[16px]"
               />
             </div>
 
           </div>
 
           {/* BOTÕES DE AÇÃO */}
-          <div className="px-4 pt-6 pb-4 flex flex-col gap-3">
+          <div className="px-4 pt-8 pb-4 flex flex-col gap-3">
             <button
               onClick={handleSalvar}
-              disabled={salvando}
+              disabled={salvando || comprimindo}
               className="w-full bg-[#16a34a] hover:bg-[#15803d] text-white font-bold py-4 rounded-sm flex justify-center items-center gap-2 transition-colors cursor-pointer disabled:opacity-60"
             >
               {salvando ? <Loader2 className="animate-spin" size={20} /> : null}
-              {salvando ? "Salvando..." : "Salvar e Escalar"}
+              {salvando ? "Salvando Evento..." : "Salvar e Escalar"}
             </button>
 
             <button

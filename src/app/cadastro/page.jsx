@@ -71,7 +71,34 @@ export default function Cadastro() {
     if (name === "cpf") {
       formattedValue = maskCPF(value);
     } else if (name === "whatsapp") {
-      formattedValue = maskPhone(value);
+      // Pega apenas os números digitados
+      let rawDigits = value.replace(/\D/g, "");
+      // Se começar com zero (ex: 085), remove o zero
+      if (rawDigits.startsWith("0")) {
+        rawDigits = rawDigits.substring(1);
+      }
+      formattedValue = maskPhone(rawDigits);
+    } else if (name === "dataNascimento") {
+      // Máscara automática de Data (DD/MM/AAAA)
+      formattedValue = value
+        .replace(/\D/g, "") 
+        .replace(/(\d{2})(\d)/, "$1/$2") 
+        .replace(/(\d{2})(\d)/, "$1/$2") 
+        .replace(/(\d{4})\d+?$/, "$1"); 
+    } else if (name === "nome") {
+      // Formatação automática do Nome (Iniciais maiúsculas)
+      formattedValue = value
+        .toLowerCase()
+        .split(" ")
+        .map((word) => {
+          if (word.length === 0) return word; // Mantém espaços extras enquanto digita
+          const preposicoes = ["de", "da", "do", "das", "dos", "e"];
+          // Mantém as preposições em minúsculo
+          if (preposicoes.includes(word)) return word;
+          // Capitaliza a primeira letra do resto
+          return word.charAt(0).toUpperCase() + word.slice(1);
+        })
+        .join(" ");
     }
 
     setForm((prev) => ({ ...prev, [name]: formattedValue }));
@@ -308,15 +335,12 @@ export default function Cadastro() {
             />
             <FormInput
               icon={CalendarFold}
-              type={form.dataNascimento ? "date" : "text"}
-              onFocus={(e) => (e.target.type = "date")}
-              onBlur={(e) => {
-                if (!form.dataNascimento) e.target.type = "text";
-              }}
+              type="text"
               name="dataNascimento"
               value={form.dataNascimento}
               onChange={handleChange}
-              placeholder="Data de nascimento"
+              placeholder="DD/MM/AAAA"
+              maxLength={10}
             />
             <FormInput
               icon={Smartphone}

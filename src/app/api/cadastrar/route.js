@@ -15,6 +15,18 @@ export async function POST(request) {
     const body = await request.json();
     console.log("🔍 DADOS RECEBIDOS DO FRONT-END:", body);
 
+    // --- INÍCIO DA CONVERSÃO DA DATA ---
+    // Transforma a data de DD/MM/AAAA (digitada) para AAAA-MM-DD (formato do banco)
+    let dataBanco = body.data_nascimento;
+    if (dataBanco && dataBanco.includes('/')) {
+      const partes = dataBanco.split('/');
+      // Garante que tem dia, mês e ano antes de inverter
+      if (partes.length === 3) {
+        dataBanco = `${partes[2]}-${partes[1]}-${partes[0]}`;
+      }
+    }
+    // --- FIM DA CONVERSÃO DA DATA ---
+
     // 1. Tenta criar o usuário no Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: body.email,
@@ -41,7 +53,7 @@ export async function POST(request) {
       id: authData.user.id,
       nome_completo: body.nome_completo,
       cpf: body.cpf,
-      data_nascimento: body.data_nascimento,
+      data_nascimento: dataBanco, // <-- AGORA USA A DATA CONVERTIDA AQUI
       whatsapp: body.whatsapp,
       cargo: body.cargo,
       emblema: body.emblema,
