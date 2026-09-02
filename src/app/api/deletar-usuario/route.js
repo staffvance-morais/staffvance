@@ -1,16 +1,27 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
-// Cliente com permissão total (service_role) — NUNCA expor no client
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+export const dynamic = "force-dynamic";
 
 // Roles que têm permissão para deletar usuários
 const ROLES_PERMITIDOS = ["admin", "owner"];
 
 export async function DELETE(request) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return NextResponse.json(
+      { error: "Configuração do Supabase ausente no servidor." },
+      { status: 500 }
+    );
+  }
+
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
   try {
     // ─── 1. VERIFICAR AUTENTICAÇÃO DO CHAMADOR ─────────────────────
     const authHeader = request.headers.get("authorization");
