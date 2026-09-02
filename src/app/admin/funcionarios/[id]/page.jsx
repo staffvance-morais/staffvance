@@ -15,7 +15,8 @@ import {
   CalendarFold,
   Wallet,
   GraduationCap,
-  Shirt
+  Shirt,
+  ShieldCheck
 } from "lucide-react";
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
@@ -27,21 +28,37 @@ export default function PerfilDetalhado() {
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Estados Editáveis
   const [classificacao, setClassificacao] = useState("");
   const [anotacoes, setAnotacoes] = useState("");
+  const [role, setRole] = useState("staff");
 
   useEffect(() => {
     const fetchPerfil = async () => {
       try {
+        // Verifica se o usuário atual logado é admin
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: userPerfil } = await supabase.from('perfis').select('role').eq('id', user.id).single();
+          if (userPerfil?.role === 'admin') {
+            setIsAdmin(true);
+          }
+        }
+
         const { data } = await supabase.from('perfis').select('*').eq('id', perfilId).single();
         if (data) {
           setPerfil(data);
           setClassificacao(data.classificacao || "");
           setAnotacoes(data.anotacoes || "");
+          setRole(data.role || "staff");
         }
-      } catch (error) { console.error(error); } finally { setLoading(false); }
+      } catch (error) { 
+        console.error(error); 
+      } finally { 
+        setLoading(false); 
+      }
     };
     if (perfilId) fetchPerfil();
   }, [perfilId]);
@@ -49,10 +66,27 @@ export default function PerfilDetalhado() {
   const handleSalvarEdicao = async () => {
     setSalvando(true);
     try {
-      await supabase.from('perfis').update({ classificacao, anotacoes }).eq('id', perfilId);
-      setPerfil(prev => ({ ...prev, classificacao, anotacoes }));
+      const updateData = { 
+        classificacao, 
+        anotacoes 
+      };
+
+      if (isAdmin) {
+        updateData.role = role;
+        updateData.cargo = role; // Mantém a coluna cargo sincronizada com o papel
+      }
+
+      const { error } = await supabase.from('perfis').update(updateData).eq('id', perfilId);
+      if (error) throw error;
+
+      setPerfil(prev => ({ ...prev, ...updateData }));
       setEditMode(false);
-    } catch (error) { alert("Erro ao salvar"); } finally { setSalvando(false); }
+    } catch (error) { 
+      console.error(error);
+      alert("Erro ao salvar alterações: " + (error.message || error)); 
+    } finally { 
+      setSalvando(false); 
+    }
   };
 
   // Função para formatar a data do banco (AAAA-MM-DD) para (DD/MM/AAAA) visualmente
@@ -73,10 +107,10 @@ export default function PerfilDetalhado() {
         
         <div className="flex justify-between items-center p-5 border-b border-[#333]">
           <div className="flex items-center gap-4">
-            <button onClick={() => router.back()} className="text-[#999] hover:text-white"><ArrowLeft size={24} /></button>
+            <button onClick={() => router.back()} className="text-[#999] hover:text-white cursor-pointer"><ArrowLeft size={24} /></button>
             <h1 className="text-white font-semibold">Perfil Detalhado</h1>
           </div>
-          <button onClick={() => editMode ? handleSalvarEdicao() : setEditMode(true)} className="flex items-center gap-2 text-[#2563eb] hover:text-[#1d4ed8] font-bold">
+          <button onClick={() => editMode ? handleSalvarEdicao() : setEditMode(true)} className="flex items-center gap-2 text-[#2563eb] hover:text-[#1d4ed8] font-bold cursor-pointer">
             {salvando ? <Loader2 className="animate-spin" size={18}/> : editMode ? <Save size={18} /> : <Edit3 size={18} />}
             {editMode ? "SALVAR" : "EDITAR"}
           </button>
@@ -87,7 +121,7 @@ export default function PerfilDetalhado() {
             {perfil?.foto_url ? <img src={perfil.foto_url} className="w-full h-full object-cover" /> : <User size={40} className="text-[#777]"/>}
           </div>
           <h2 className="text-[22px] font-bold text-white capitalize">{perfil?.nome_completo}</h2>
-          <p className="text-[#2563eb] uppercase tracking-widest text-[12px] font-bold mt-1">{perfil?.role}</p>
+          <p className="text-[#2563eb] uppercase tracking-widest text-[12px] font-bold mt-1">{perfil?.role || 'staff'}</p>
         </div>
 
         <div className="p-6">
@@ -157,23 +191,77 @@ export default function PerfilDetalhado() {
           <div className="mt-8">
             <p className="text-[#777] text-[12px] font-bold uppercase tracking-wider mb-4 flex items-center gap-2"><Award size={14}/> Gestão Interna (Morais)</p>
             
+            {/* Cargo/Papel no Sistema (Exclusivo Admin) */}
+            <div className="bg-[#222] border border-[#333] rounded-md p-5 mb-4">
+              <p className="text-[#999] text-[13px] mb-3 flex items-center gap-2">
+                <ShieldCheck size={16} className="text-[#2563eb]"/> Cargo / Função no Sistema:
+              </p>
+              {editMode && isAdmin ? (
+                <div className="flex gap-3">
+                  {[
+                    { key: 'staff', label: 'Staff' },
+                    { key: 'coordenador', label: 'Coordenador' }
+                  ].map(r => (
+                    <button 
+                      key={r.key} 
+                      type="button"
+                      onClick={() => setRole(r.key)} 
+                      className={`px-4 py-2 rounded-sm border font-bold text-[13px] transition-colors cursor-pointer ${
+                        role === r.key 
+                          ? 'bg-[#2563eb] border-[#2563eb] text-white shadow-md' 
+                          : 'border-[#444] text-[#777] hover:bg-[#333] hover:text-white'
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <span className={`inline-block px-4 py-1.5 rounded-sm font-bold text-[13px] uppercase tracking-wider ${
+                  role === 'coordenador' 
+                    ? 'bg-purple-900/40 text-purple-300 border border-purple-600/50' 
+                    : role === 'admin' 
+                      ? 'bg-red-900/40 text-red-300 border border-red-600/50' 
+                      : 'bg-blue-900/40 text-blue-300 border border-blue-600/50'
+                }`}>
+                  {role || 'staff'}
+                </span>
+              )}
+            </div>
+
+            {/* Classificação do Staff */}
             <div className="bg-[#222] border border-[#333] rounded-md p-5 mb-4">
               <p className="text-[#999] text-[13px] mb-3">Classificação do Staff:</p>
               {editMode ? (
                 <div className="flex gap-3">
                   {['Ouro', 'Prata', 'Bronze'].map(cat => (
-                    <button key={cat} onClick={() => setClassificacao(cat)} className={`px-4 py-2 rounded-sm border font-bold text-[13px] ${classificacao === cat ? 'bg-[#2563eb] border-[#2563eb] text-white' : 'border-[#444] text-[#777] hover:bg-[#333]'}`}>
+                    <button 
+                      key={cat} 
+                      type="button"
+                      onClick={() => setClassificacao(cat)} 
+                      className={`px-4 py-2 rounded-sm border font-bold text-[13px] transition-colors cursor-pointer ${
+                        classificacao === cat 
+                          ? 'bg-[#2563eb] border-[#2563eb] text-white' 
+                          : 'border-[#444] text-[#777] hover:bg-[#333] hover:text-white'
+                      }`}
+                    >
                       {cat}
                     </button>
                   ))}
                 </div>
               ) : (
-                <span className={`px-4 py-1.5 rounded-sm font-bold text-[13px] uppercase ${classificacao === 'Ouro' ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50' : classificacao === 'Prata' ? 'bg-gray-400/20 text-gray-300 border border-gray-400/50' : classificacao === 'Bronze' ? 'bg-orange-700/20 text-orange-500 border border-orange-700/50' : 'text-[#666] border border-[#444]'}`}>
+                <span className={`px-4 py-1.5 rounded-sm font-bold text-[13px] uppercase ${
+                  classificacao === 'Ouro' ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50' : 
+                  classificacao === 'Prata' ? 'bg-gray-400/20 text-gray-300 border border-gray-400/50' : 
+                  classificacao === 'Bronze' ? 'bg-orange-700/20 text-orange-500 border border-orange-700/50' : 
+                  'text-[#666] border border-[#444]'
+                }`}>
                   {classificacao || 'Não Classificado'}
                 </span>
               )}
             </div>
 
+            {/* Anotações Confidenciais */}
             <div className="bg-[#222] border border-[#333] rounded-md p-5">
               <p className="text-[#999] text-[13px] mb-3 flex items-center gap-2"><FileText size={16}/> Anotações Confidenciais:</p>
               {editMode ? (
