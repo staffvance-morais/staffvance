@@ -161,53 +161,38 @@ export default function Cadastro() {
     setLoading(true);
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: email.trim(),
-        password: senha,
-      });
-
-      if (authError) throw authError;
-      if (!authData?.user?.id) {
-        throw new Error("Usuário não retornado após criação.");
-      }
-
-      const userId = authData.user.id;
-      let fotoUrl = null;
-
+      // Converte a foto em base64 para envio seguro ao servidor
+      let fotoBase64 = null;
       if (fotoArquivo) {
-        const fileExt = fotoArquivo.name.split(".").pop() || "jpg";
-        const fileName = `${userId}-perfil.${fileExt}`;
-        const filePath = `fotos_perfil/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("perfis")
-          .upload(filePath, fotoArquivo, { upsert: true });
-
-        if (uploadError) throw uploadError;
-
-        const { data: publicUrlData } = supabase.storage
-          .from("perfis")
-          .getPublicUrl(filePath);
-
-        fotoUrl = publicUrlData.publicUrl;
+        fotoBase64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(fotoArquivo);
+        });
       }
 
-      const { error: dbError } = await supabase.from("perfis").upsert({
-        id: userId,
-        nome_completo: nome.trim(),
-        role: "staff",
-        cpf: cpf.trim(),
-        whatsapp: whatsapp.trim(),
-        chave_pix: chavePix.trim(),
-        data_nascimento: dataNascimento || null,
-        curso,
-        uniforme,
-        foto_url: fotoUrl,
-        email: email.trim(),
+      const res = await fetch("/api/cadastrar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: senha,
+          nome_completo: nome.trim(),
+          cpf: cpf.trim(),
+          data_nascimento: dataNascimento,
+          whatsapp: whatsapp.trim(),
+          chave_pix: chavePix.trim(),
+          curso,
+          uniforme,
+          foto_base64: fotoBase64,
+        }),
       });
 
-      if (dbError) throw dbError;
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Ocorreu um erro no cadastro.");
 
+      // Dispara e-mail de notificação em segundo plano se disponível
       try {
         await fetch("/api/notificar-cadastro", {
           method: "POST",
@@ -221,14 +206,13 @@ export default function Cadastro() {
             dataNascimento,
             curso,
             uniforme,
-            fotoUrl,
           }),
         });
       } catch (emailError) {
         console.warn("Falha ao enviar notificação de cadastro:", emailError);
       }
 
-      setMensagem("Cadastro realizado com sucesso!");
+      setMensagem("Cadastro realizado com sucesso! Faça login para continuar.");
       window.scrollTo({ top: 0, behavior: "smooth" });
       setTimeout(() => {
         router.push("/");
@@ -237,10 +221,9 @@ export default function Cadastro() {
       let msg = error?.message || "Ocorreu um erro no cadastro.";
       if (
         msg.toLowerCase().includes("already registered") ||
-        msg.toLowerCase().includes("already in use") ||
-        msg.toLowerCase().includes("unique constraint")
+        msg.toLowerCase().includes("already in use")
       ) {
-        msg = "Este e-mail já está cadastrado.";
+        msg = "Este e-mail já está cadastrado no sistema.";
       } else if (msg.toLowerCase().includes("password")) {
         msg = "A senha deve ter no mínimo 6 caracteres.";
       } else if (msg.toLowerCase().includes("network") || msg.toLowerCase().includes("fetch")) {
