@@ -42,7 +42,8 @@ export default function PerfilDetalhado() {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           const { data: userPerfil } = await supabase.from('perfis').select('role').eq('id', user.id).single();
-          if (userPerfil?.role === 'admin') {
+          const roleNorm = (userPerfil?.role || "").toLowerCase().trim();
+          if (roleNorm === 'admin' || roleNorm === 'owner') {
             setIsAdmin(true);
           }
         }
@@ -66,20 +67,38 @@ export default function PerfilDetalhado() {
   const handleSalvarEdicao = async () => {
     setSalvando(true);
     try {
-      const updateData = { 
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Sessão expirada. Faça login novamente.");
+
+      const payload = { 
+        userId: perfilId,
         classificacao, 
         anotacoes 
       };
 
       if (isAdmin) {
-        updateData.role = role;
-        updateData.cargo = role; // Mantém a coluna cargo sincronizada com o papel
+        payload.role = role;
+        payload.cargo = role; // Mantém a coluna cargo sincronizada com o papel
       }
 
-      const { error } = await supabase.from('perfis').update(updateData).eq('id', perfilId);
-      if (error) throw error;
+      const res = await fetch("/api/atualizar-usuario", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
-      setPerfil(prev => ({ ...prev, ...updateData }));
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Erro ao salvar no servidor.");
+
+      setPerfil(prev => ({ 
+        ...prev, 
+        classificacao, 
+        anotacoes,
+        ...(isAdmin ? { role, cargo: role } : {})
+      }));
       setEditMode(false);
     } catch (error) { 
       console.error(error);

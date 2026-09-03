@@ -3,10 +3,10 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-// Roles que têm permissão para deletar usuários
+// Roles que têm permissão para atualizar usuários
 const ROLES_PERMITIDOS = ["admin", "owner", "coordenador"];
 
-export async function DELETE(request) {
+export async function PUT(request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -18,6 +18,7 @@ export async function DELETE(request) {
     );
   }
 
+  // Cliente Admin (com Service Role Key se disponível, ou Anon Key)
   const supabaseAdmin = createClient(
     supabaseUrl,
     supabaseServiceKey || supabaseAnonKey,
@@ -25,7 +26,7 @@ export async function DELETE(request) {
   );
 
   try {
-    // ─── 1. VERIFICAR AUTENTICAÇÃO DO CHAMADOR ─────────────────────
+    // ─── 1. VERIFICAR AUTENTICAÇÃO E PERMISSÃO DO CHAMADOR ─────────
     const authHeader = request.headers.get("authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json(
@@ -49,7 +50,7 @@ export async function DELETE(request) {
       );
     }
 
-    // Cliente autenticado como o próprio chamador para ler seu próprio perfil via RLS
+    // Cliente com o token do próprio usuário chamador para respeitar RLS ao ler seu próprio perfil
     const supabaseUserClient = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: `Bearer ${token}` } },
       auth: { autoRefreshToken: false, persistSession: false },
@@ -57,6 +58,7 @@ export async function DELETE(request) {
 
     let roleChamador = (chamador.user_metadata?.role || "").toLowerCase().trim();
 
+    // Busca na tabela perfis com o cliente do usuário
     const { data: perfilChamador } = await supabaseUserClient
       .from("perfis")
       .select("role")
@@ -69,62 +71,62 @@ export async function DELETE(request) {
 
     if (!ROLES_PERMITIDOS.includes(roleChamador)) {
       return NextResponse.json(
-        { error: "Acesso negado. Apenas administradores podem excluir usuários." },
+        {
+          error:
+            "Acesso negado. Apenas administradores podem atualizar o perfil/cargo de funcionários.",
+        },
         { status: 403 }
       );
     }
 
-    // Verifica se a Service Role Key está disponível para exclusão
-    if (!supabaseServiceKey) {
-      return NextResponse.json(
-        {
-          error:
-            "SUPABASE_SERVICE_ROLE_KEY não foi configurada nas variáveis de ambiente do servidor (Netlify/Vercel). Adicione a chave de serviço para permitir exclusões.",
-        },
-        { status: 500 }
-      );
-    }
-
     // ─── 2. VALIDAR O PAYLOAD ──────────────────────────────────────
-    const { userId } = await request.json();
+    const { userId, role, cargo, classificacao, anotacoes } = await request.json();
 
     if (!userId) {
       return NextResponse.json({ error: "userId é obrigatório." }, { status: 400 });
     }
 
-    // Impede o admin de deletar a si mesmo
-    if (userId === chamador.id) {
+    // Monta o objeto com apenas os campos fornecidos
+    const updateData = {};
+    if (role !== undefined) updateData.role = role;
+    if (cargo !== undefined) updateData.cargo = cargo;
+    if (classificacao !== undefined) updateData.classificacao = classificacao;
+    if (anotacoes !== undefined) updateData.anotacoes = anotacoes;
+
+    // ─── 3. ATUALIZAR TABELA PERFIS VIA SUPABASE ADMIN ─────────────
+    const { error: updateDbError } = await supabaseAdmin
+      .from("perfis")
+      .update(updateData)
+      .eq("id", userId);
+
+    if (updateDbError) {
+      console.error("Erro ao atualizar tabela perfis:", updateDbError);
       return NextResponse.json(
-        { error: "Você não pode excluir a sua própria conta por aqui." },
+        { error: "Erro ao atualizar dados no banco: " + updateDbError.message },
         { status: 400 }
       );
     }
 
-    // ─── 3. DELETAR PERFIL DA TABELA ──────────────────────────────
-    const { error: perfilError } = await supabaseAdmin
-      .from("perfis")
-      .delete()
-      .eq("id", userId);
-
-    if (perfilError) {
-      console.error("Erro ao deletar perfil:", perfilError);
-      // Não interrompe — tenta deletar do Auth mesmo assim
+    // ─── 4. Opcional: Atualizar user_metadata no Auth se role/cargo foram alterados
+    if ((role !== undefined || cargo !== undefined) && supabaseServiceKey) {
+      try {
+        const metadataUpdate = {};
+        if (role !== undefined) metadataUpdate.role = role;
+        if (cargo !== undefined) metadataUpdate.cargo = cargo;
+        await supabaseAdmin.auth.admin.updateUserById(userId, {
+          user_metadata: metadataUpdate,
+        });
+      } catch (authMetaErr) {
+        console.warn("Não foi possível atualizar user_metadata no Auth:", authMetaErr);
+      }
     }
 
-    // ─── 4. DELETAR DO SUPABASE AUTH ──────────────────────────────
-    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
-
-    if (authError) {
-      console.error("Erro ao deletar usuário do Auth:", authError);
-      return NextResponse.json(
-        { error: "Erro ao remover usuário do sistema de autenticação: " + authError.message },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, updated: updateData });
   } catch (err) {
-    console.error("Erro inesperado na rota deletar-usuario:", err);
-    return NextResponse.json({ error: "Erro interno do servidor." }, { status: 500 });
+    console.error("Erro inesperado na rota atualizar-usuario:", err);
+    return NextResponse.json(
+      { error: "Erro interno do servidor ao atualizar usuário." },
+      { status: 500 }
+    );
   }
 }
