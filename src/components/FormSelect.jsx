@@ -14,6 +14,7 @@ export default function FormSelect({
   className = "",
   required = false,
   disabled = false,
+  hasError = false,
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
@@ -87,8 +88,12 @@ export default function FormSelect({
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className={`flex min-h-14 w-full cursor-pointer items-center justify-between gap-4 border-2 border-neutral-600 bg-neutral-700 px-4 text-left transition-colors focus:border-neutral-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
-          isOpen ? "border-neutral-500" : ""
+        className={`flex min-h-14 w-full cursor-pointer items-center justify-between gap-4 border-2 bg-neutral-700 px-4 text-left transition-colors focus:border-neutral-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
+          hasError
+            ? "border-red-500 bg-red-950/20"
+            : isOpen
+            ? "border-neutral-500"
+            : "border-neutral-600"
         }`}
       >
         <div className="flex items-center gap-4 overflow-hidden">

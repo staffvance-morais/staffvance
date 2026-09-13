@@ -1,7 +1,7 @@
 "use client";
+import { supabase } from "@/lib/supabase";
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import { 
   ArrowLeft, 
   Edit3, 
@@ -14,13 +14,11 @@ import {
   Loader2,
   Image as ImageIcon,
   Printer,
-  Compass
+  Compass,
+  CheckCircle2,
+  Trash2,
+  AlertTriangle
 } from "lucide-react";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 export default function DetalhesEvento() {
   const router = useRouter();
@@ -30,6 +28,10 @@ export default function DetalhesEvento() {
   const [evento, setEvento] = useState(null);
   const [totalEscalados, setTotalEscalados] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // Estados para exclusão
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [deletando, setDeletando] = useState(false);
 
   useEffect(() => {
     const fetchDetalhes = async () => {
@@ -63,6 +65,54 @@ export default function DetalhesEvento() {
       fetchDetalhes();
     }
   }, [eventoId]);
+
+  const handleExcluirEvento = async () => {
+    setDeletando(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      let deletado = false;
+
+      if (session?.access_token) {
+        const res = await fetch("/api/admin/deletar-evento", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ eventoId }),
+        });
+
+        if (res.ok) {
+          deletado = true;
+        } else {
+          const json = await res.json().catch(() => ({}));
+          console.warn("Aviso rota API deletar evento:", json.error);
+        }
+      }
+
+      if (!deletado) {
+        // Fallback direto
+        await supabase
+          .from("escalas")
+          .delete()
+          .eq("evento_id", eventoId);
+
+        const { error: dbError } = await supabase
+          .from("eventos")
+          .delete()
+          .eq("id", eventoId);
+
+        if (dbError) throw dbError;
+      }
+
+      setShowConfirmDelete(false);
+      router.push('/admin/eventos');
+    } catch (err) {
+      console.error("Erro ao excluir evento:", err);
+      alert("Erro ao excluir evento: " + (err.message || "Tente novamente"));
+      setDeletando(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -117,13 +167,24 @@ export default function DetalhesEvento() {
             <h1 className="text-[18px] font-semibold tracking-wide text-[#e5e5e5]">Detalhes da Operação</h1>
           </div>
           
-          <button 
-            onClick={() => router.push(`/admin/eventos/${eventoId}/editar`)}
-            className="flex items-center gap-2 text-[#2563eb] hover:text-[#1d4ed8] font-bold text-[14px] bg-[#2563eb]/10 px-3 py-2 rounded-sm transition-colors cursor-pointer"
-          >
-            <Edit3 size={18} strokeWidth={2} />
-            EDITAR
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setShowConfirmDelete(true)}
+              title="Excluir operação"
+              className="flex items-center gap-1.5 text-red-400 hover:text-red-300 font-bold text-[14px] bg-red-950/40 border border-red-900/60 px-3 py-2 rounded-sm transition-colors cursor-pointer"
+            >
+              <Trash2 size={16} strokeWidth={2} />
+              EXCLUIR
+            </button>
+
+            <button 
+              onClick={() => router.push(`/admin/eventos/${eventoId}/editar`)}
+              className="flex items-center gap-2 text-[#2563eb] hover:text-[#1d4ed8] font-bold text-[14px] bg-[#2563eb]/10 px-3 py-2 rounded-sm transition-colors cursor-pointer"
+            >
+              <Edit3 size={18} strokeWidth={2} />
+              EDITAR
+            </button>
+          </div>
         </div>
 
         {/* CABEÇALHO EXCLUSIVO PARA O PDF */}
@@ -198,10 +259,9 @@ export default function DetalhesEvento() {
           
           <div className="flex flex-col gap-3">
             
-            {/* BOTÃO INTELIGENTE DO MAPA TÁTICO (Só aparece se o evento for no Presidente Vargas) */}
+            {/* BOTÃO INTELIGENTE DO MAPA TÁTICO */}
             {possuiMapaTatico && (
               <div 
-                // ======= A CORREÇÃO FOI FEITA AQUI NESTA LINHA ABAIXO =======
                 onClick={() => router.push(`/mapa?evento=${eventoId}`)}
                 className="bg-[#2a2a2a] border border-[#16a34a]/40 hover:border-[#16a34a] p-4 rounded-sm flex items-center justify-between cursor-pointer transition-colors group shadow-md"
               >
@@ -219,6 +279,25 @@ export default function DetalhesEvento() {
                 </div>
               </div>
             )}
+
+            {/* Controle de Presença (Chamada) */}
+            <div 
+              onClick={() => router.push(`/coordenador/eventos/${eventoId}/presenca`)}
+              className="bg-[#2a2a2a] border border-[#3a3a3a] hover:border-[#16a34a] p-4 rounded-sm flex items-center justify-between cursor-pointer transition-colors group shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#16a34a]/10 rounded-full flex items-center justify-center text-[#16a34a]">
+                  <CheckCircle2 size={20} />
+                </div>
+                <div>
+                  <h4 className="text-[#e5e5e5] font-semibold text-[15px] flex items-center gap-2">
+                    Controle de Presença
+                    <span className="text-[10px] bg-[#16a34a]/20 text-emerald-400 border border-[#16a34a]/40 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">Ao Vivo</span>
+                  </h4>
+                  <p className="text-[#999] text-[13px]">Lista de chamada em tempo real e selfies</p>
+                </div>
+              </div>
+            </div>
 
             {/* Gerenciar Escala */}
             <div 
@@ -272,6 +351,62 @@ export default function DetalhesEvento() {
         </div>
 
       </div>
+
+      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
+      {showConfirmDelete && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-6"
+          onClick={() => !deletando && setShowConfirmDelete(false)}
+        >
+          <div 
+            className="bg-[#1e1e1e] border border-[#3a3a3a] rounded-sm p-6 w-full max-w-xs flex flex-col gap-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-950 border border-red-800 rounded-sm flex items-center justify-center shrink-0">
+                <AlertTriangle size={20} className="text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-white font-bold text-base leading-tight">Excluir evento</h3>
+                <p className="text-gray-400 text-xs mt-0.5">Esta ação não pode ser desfeita</p>
+              </div>
+            </div>
+
+            <p className="text-gray-300 text-sm leading-relaxed">
+              Deseja excluir a operação <strong className="text-white font-semibold">"{evento?.titulo}"</strong>? Todas as escalas e registros associados a este evento serão removidos.
+            </p>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowConfirmDelete(false)}
+                disabled={deletando}
+                className="flex-1 py-3 border border-[#444] bg-[#2a2a2a] text-gray-300 rounded-sm text-sm font-medium hover:bg-[#333] transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleExcluirEvento}
+                disabled={deletando}
+                className="flex-1 py-3 bg-red-700 hover:bg-red-600 text-white rounded-sm text-sm font-bold transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                {deletando ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 size={15} className="animate-spin" /> Excluindo...
+                  </span>
+                ) : (
+                  <>
+                    <Trash2 size={15} />
+                    Excluir
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

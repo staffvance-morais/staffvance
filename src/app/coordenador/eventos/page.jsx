@@ -1,8 +1,8 @@
-"use client";
+﻿"use client";
+import { supabase } from "@/lib/supabase";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import { 
   CalendarDays, 
   Search, 
@@ -18,10 +18,6 @@ import {
 } from "lucide-react";
 
 // Conexão com o Supabase
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 const EventCard = ({ id, image, title, location, date, time, client, staffCount, isLive, selected, router }) => {
   return (

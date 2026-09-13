@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
+import { supabase } from "@/lib/supabase";
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import {
   CalendarDays,
   ChevronRight,
@@ -17,10 +17,6 @@ import {
   Loader2
 } from "lucide-react";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 const STORAGE_BUCKET = "eventos-fotos";
 

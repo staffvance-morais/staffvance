@@ -1,17 +1,13 @@
-"use client";
+﻿"use client";
+import { supabase } from "@/lib/supabase";
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import { 
   ArrowLeft, Save, Loader2, Type, Briefcase, MapPin, 
   Calendar, Image as ImageIcon, Search, Check, Shield, Users
 } from "lucide-react";
 
 // Conexão com o Supabase
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 // Função auxiliar para data
 const formatarDataParaInput = (dataString) => {

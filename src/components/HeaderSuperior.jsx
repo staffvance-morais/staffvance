@@ -97,6 +97,17 @@ const ROUTE_CONFIG = {
       { label: "Cadastrar cliente" },
     ],
   },
+  "/coordenador/clientes": {
+    icon: Users,
+    items: [{ label: "Clientes" }],
+  },
+  "/coordenador/clientes/cadastrar": {
+    icon: Users,
+    items: [
+      { label: "Clientes", href: "/coordenador/clientes" },
+      { label: "Cadastrar cliente" },
+    ],
+  },
   "/admin/financeiro": {
     icon: DollarSign,
     items: [{ label: "Financeiro" }],
@@ -152,6 +163,18 @@ function resolveRouteConfig(pathname) {
       items: [
         { label: "Eventos", href: baseHref },
         { label: subAction },
+      ],
+    };
+  }
+
+  if (pathname.includes("/clientes/")) {
+    const isCoordenador = pathname.startsWith("/coordenador");
+    const baseHref = isCoordenador ? "/coordenador/clientes" : "/admin/clientes";
+    return {
+      icon: Users,
+      items: [
+        { label: "Clientes", href: baseHref },
+        { label: "Detalhes do cliente" },
       ],
     };
   }

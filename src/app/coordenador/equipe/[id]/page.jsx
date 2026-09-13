@@ -1,7 +1,7 @@
 "use client";
+import { supabase } from "@/lib/supabase";
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import { 
   ArrowLeft, 
   User, 
@@ -19,7 +19,6 @@ import {
   ShieldCheck
 } from "lucide-react";
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
 export default function DetalhesStaffCoordenador() {
   const router = useRouter();
@@ -38,9 +37,9 @@ export default function DetalhesStaffCoordenador() {
     const fetchPerfil = async () => {
       try {
         // Verifica se o usuário atual logado tem permissão
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: userPerfil } = await supabase.from('perfis').select('role').eq('id', user.id).single();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const { data: userPerfil } = await supabase.from('perfis').select('role').eq('id', session.user.id).single();
           const roleNorm = (userPerfil?.role || "").toLowerCase().trim();
           if (roleNorm === 'admin' || roleNorm === 'owner' || roleNorm === 'coordenador') {
             setIsCoordenadorOrAdmin(true);

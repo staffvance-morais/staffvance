@@ -1,13 +1,8 @@
 "use client";
+import { supabase } from "@/lib/supabase";
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import { CalendarDays, ChevronRight, User, Info, Menu, Loader2 } from "lucide-react";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 export default function SelecionarSetorEscalaCoordenador() {
   const router = useRouter();
@@ -16,6 +11,7 @@ export default function SelecionarSetorEscalaCoordenador() {
 
   const [loading, setLoading] = useState(true);
   const [salvandoSetor, setSalvandoSetor] = useState(false);
+  const [enviandoRelatorio, setEnviandoRelatorio] = useState(false);
   const [escalas, setEscalas] = useState([]);
   
   const [setores, setSetores] = useState([
@@ -105,6 +101,22 @@ export default function SelecionarSetorEscalaCoordenador() {
 
   const totalEscaladosGeral = escalas.length;
 
+  const handleConcluir = async () => {
+    setEnviandoRelatorio(true);
+    try {
+      await fetch("/api/resumo-camisas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventoId }),
+      });
+    } catch (err) {
+      console.error("Erro ao enviar relatorio de camisas:", err);
+    } finally {
+      setEnviandoRelatorio(false);
+      router.push(`/coordenador/eventos/${eventoId}`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#171717] font-sans flex flex-col items-center pb-10">
       <div className="w-full max-w-[400px] min-h-screen flex flex-col bg-[#171717] relative">
@@ -149,7 +161,6 @@ export default function SelecionarSetorEscalaCoordenador() {
                           </div>
                         )}
                         <button 
-                          // ATUALIZADO: Redireciona para a tela de alocar equipe do Coordenador
                           onClick={() => router.push(`/coordenador/eventos/${eventoId}/alocar?setor=${encodeURIComponent(nomeSetor)}`)}
                           className="w-10 h-10 border border-[#555] rounded-sm flex items-center justify-center text-[#999] hover:bg-[#333] hover:text-[#e5e5e5] transition-colors mt-1 cursor-pointer"
                         >
@@ -185,10 +196,18 @@ export default function SelecionarSetorEscalaCoordenador() {
 
             {totalEscaladosGeral > 0 ? (
               <button 
-                onClick={() => router.push(`/coordenador/eventos/${eventoId}`)}
-                className="w-full bg-[#16a34a] hover:bg-[#15803d] text-white font-bold py-3.5 rounded-sm transition-colors cursor-pointer text-[16px]"
+                onClick={handleConcluir}
+                disabled={enviandoRelatorio}
+                className="w-full bg-[#16a34a] hover:bg-[#15803d] text-white font-bold py-3.5 rounded-sm transition-colors cursor-pointer text-[16px] flex items-center justify-center gap-2"
               >
-                Concluir
+                {enviandoRelatorio ? (
+                  <>
+                    <Loader2 className="animate-spin" size={20} />
+                    <span>Enviando relatório...</span>
+                  </>
+                ) : (
+                  "Concluir"
+                )}
               </button>
             ) : (
               <button 

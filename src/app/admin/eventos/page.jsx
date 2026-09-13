@@ -1,32 +1,28 @@
 "use client";
+import { supabase } from "@/lib/supabase";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import { 
   CalendarDays, 
   Search, 
   Calendar, 
   Handshake, 
   ClipboardList, 
-  Info, // <-- Voltamos para o ícone de Informação (i)
+  Info, 
   Check, 
   Filter, 
   ChevronUp, 
   Menu,
-  Loader2 
+  Loader2,
+  Trash2,
+  AlertTriangle 
 } from "lucide-react";
-
-// Conexão com o Supabase
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 // ==========================================
 // COMPONENTE: CARD DO EVENTO (DINÂMICO)
 // ==========================================
-const EventCard = ({ id, image, title, location, date, time, client, staffCount, isLive, selected, router }) => {
+const EventCard = ({ id, image, title, location, date, time, client, staffCount, isLive, isPassado, selected, router, onDeleteClick }) => {
   return (
     <div className="border border-[#3a3a3a] bg-[#222222] flex flex-col mb-4 rounded-sm overflow-hidden shrink-0">
       {/* Imagem do Evento */}
@@ -36,6 +32,18 @@ const EventCard = ({ id, image, title, location, date, time, client, staffCount,
         ) : (
           <div className="flex items-center justify-center h-full text-[#666] text-xs">Sem Imagem</div>
         )}
+
+        {/* Badge discreta de evento passado ou ao vivo */}
+        {isLive ? (
+          <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-black/80 border border-[#22c55e]/50 px-2 py-0.5 rounded-sm text-[#22c55e] text-[11px] font-bold tracking-widest uppercase">
+            <div className="w-2 h-2 bg-[#22c55e] rounded-full animate-pulse"></div> 
+            AO VIVO
+          </div>
+        ) : isPassado ? (
+          <div className="absolute top-2 right-2 bg-black/80 border border-[#555] px-2 py-0.5 rounded-sm text-[#999] text-[11px] font-bold tracking-wider uppercase">
+            Encerrado
+          </div>
+        ) : null}
       </div>
       
       {/* Detalhes do Evento */}
@@ -69,26 +77,27 @@ const EventCard = ({ id, image, title, location, date, time, client, staffCount,
             </div>
           </div>
 
-          {/* Status e Botão Info */}
-          <div className="flex flex-col items-end justify-between h-[84px]">
-            {isLive ? (
-              <div className="flex items-center gap-1.5 text-[#e5e5e5] text-[13px] font-bold tracking-widest uppercase">
-                <div className="w-2.5 h-2.5 bg-[#22c55e] rounded-sm"></div> 
-                AO VIVO
-              </div>
-            ) : (
-              <div></div>
-            )}
-            
-            {/* ==================================================
-                BOTÃO DE INFO (Leva para a página de Detalhes)
-                ================================================== */}
+          {/* Botões de Ação: Excluir e Info */}
+          <div className="flex items-center gap-2">
+            {/* Botão de Excluir */}
+            <button 
+              onClick={(e) => {
+                e.preventDefault();
+                onDeleteClick({ id, title });
+              }}
+              title="Excluir Evento"
+              className="w-11 h-11 border border-[#442222] rounded-sm bg-[#2a1515] flex items-center justify-center text-red-500 hover:bg-red-950 hover:border-red-700 hover:text-red-300 transition-colors cursor-pointer"
+            >
+              <Trash2 size={19} strokeWidth={1.8} />
+            </button>
+
+            {/* Botão de Info */}
             <button 
               onClick={() => router.push(`/admin/eventos/${id}`)}
               title="Ver Detalhes do Evento"
               className="w-11 h-11 border border-[#444] rounded-sm bg-[#2a2a2a] flex items-center justify-center text-[#999] hover:bg-[#333] hover:text-[#2563eb] transition-colors cursor-pointer"
             >
-              <Info size={26} strokeWidth={1.5} />
+              <Info size={24} strokeWidth={1.5} />
             </button>
           </div>
         </div>
@@ -106,58 +115,122 @@ export default function PainelEventosMorais() {
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState("");
 
+  // Estado para exclusão
+  const [confirmDelete, setConfirmDelete] = useState(null); // { id, title }
+  const [deletando, setDeletando] = useState(false);
+
   useEffect(() => {
-    const fetchEventos = async () => {
-      try {
-        const { data: evData, error: evError } = await supabase
-          .from('eventos')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (evError) throw evError;
-
-        const { data: escData } = await supabase
-          .from('escalas')
-          .select('evento_id');
-
-        if (evData) {
-          const eventosFormatados = evData.map(ev => {
-            let dataFormatada = "";
-            let horaFormatada = "";
-            if (ev.data_inicio) {
-              const d = new Date(ev.data_inicio);
-              dataFormatada = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-              horaFormatada = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + " - " + 
-                (ev.data_fim ? new Date(ev.data_fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : "");
-            }
-
-            const count = escData ? escData.filter(esc => esc.evento_id === ev.id).length : 0;
-
-            return {
-              id: ev.id,
-              title: ev.titulo,
-              location: ev.endereco_texto,
-              client: ev.nome_contratante,
-              date: dataFormatada,
-              time: horaFormatada,
-              image: ev.foto_local,
-              staffCount: `${count} escalado(s)`, 
-              isLive: false,
-              selected: true
-            };
-          });
-
-          setEventos(eventosFormatados);
-        }
-      } catch (error) {
-        console.error("Erro ao buscar eventos:", error.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchEventos();
   }, []);
+
+  const fetchEventos = async () => {
+    try {
+      const { data: evData, error: evError } = await supabase
+        .from('eventos')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (evError) throw evError;
+
+      const { data: escData } = await supabase
+        .from('escalas')
+        .select('evento_id');
+
+      if (evData) {
+        const agora = new Date();
+        const eventosFormatados = evData.map(ev => {
+          let dataFormatada = "";
+          let horaFormatada = "";
+          let isPassado = false;
+
+          if (ev.data_inicio) {
+            const d = new Date(ev.data_inicio);
+            dataFormatada = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+            horaFormatada = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + " - " + 
+              (ev.data_fim ? new Date(ev.data_fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : "");
+            
+            const dataFinal = ev.data_fim ? new Date(ev.data_fim) : d;
+            isPassado = dataFinal < agora;
+          }
+
+          const count = escData ? escData.filter(esc => esc.evento_id === ev.id).length : 0;
+
+          return {
+            id: ev.id,
+            title: ev.titulo,
+            location: ev.endereco_texto,
+            client: ev.nome_contratante,
+            date: dataFormatada,
+            time: horaFormatada,
+            image: ev.foto_local,
+            staffCount: `${count} escalado(s)`, 
+            isLive: false,
+            isPassado,
+            selected: true
+          };
+        });
+
+        setEventos(eventosFormatados);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar eventos:", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirmarExclusao = async () => {
+    if (!confirmDelete) return;
+    setDeletando(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      let deletado = false;
+
+      // 1. Tenta deletar via API de admin com token
+      if (session?.access_token) {
+        const res = await fetch("/api/admin/deletar-evento", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ eventoId: confirmDelete.id }),
+        });
+
+        if (res.ok) {
+          deletado = true;
+        } else {
+          const json = await res.json().catch(() => ({}));
+          console.warn("Aviso rota API deletar evento:", json.error);
+        }
+      }
+
+      // 2. Se a rota API falhou ou não tinha token de admin, tenta direto via client Supabase
+      if (!deletado) {
+        // Exclui escalas primeiro
+        await supabase
+          .from("escalas")
+          .delete()
+          .eq("evento_id", confirmDelete.id);
+
+        const { error: dbError } = await supabase
+          .from("eventos")
+          .delete()
+          .eq("id", confirmDelete.id);
+
+        if (dbError) throw dbError;
+      }
+
+      setEventos(prev => prev.filter(e => e.id !== confirmDelete.id));
+      setConfirmDelete(null);
+    } catch (err) {
+      console.error("Erro ao excluir evento:", err);
+      alert("Erro ao excluir evento: " + (err.message || "Tente novamente"));
+    } finally {
+      setDeletando(false);
+    }
+  };
 
   const eventosFiltrados = eventos.filter(ev => 
     ev.title?.toLowerCase().includes(busca.toLowerCase()) ||
@@ -217,8 +290,10 @@ export default function PainelEventosMorais() {
                 client={ev.client}
                 staffCount={ev.staffCount}
                 isLive={ev.isLive}
+                isPassado={ev.isPassado}
                 selected={ev.selected}
                 router={router} 
+                onDeleteClick={(evInfo) => setConfirmDelete(evInfo)}
               />
             ))
           )}
@@ -264,6 +339,62 @@ export default function PainelEventosMorais() {
         </div>
 
       </div>
+
+      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
+      {confirmDelete && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-6"
+          onClick={() => !deletando && setConfirmDelete(null)}
+        >
+          <div 
+            className="bg-[#1e1e1e] border border-[#3a3a3a] rounded-sm p-6 w-full max-w-xs flex flex-col gap-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-950 border border-red-800 rounded-sm flex items-center justify-center shrink-0">
+                <AlertTriangle size={20} className="text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-white font-bold text-base leading-tight">Excluir evento</h3>
+                <p className="text-gray-400 text-xs mt-0.5">Esta ação não pode ser desfeita</p>
+              </div>
+            </div>
+
+            <p className="text-gray-300 text-sm leading-relaxed">
+              Deseja excluir o evento <strong className="text-white font-semibold">"{confirmDelete.title}"</strong>? Todas as escalas deste evento serão removidas.
+            </p>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(null)}
+                disabled={deletando}
+                className="flex-1 py-3 border border-[#444] bg-[#2a2a2a] text-gray-300 rounded-sm text-sm font-medium hover:bg-[#333] transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmarExclusao}
+                disabled={deletando}
+                className="flex-1 py-3 bg-red-700 hover:bg-red-600 text-white rounded-sm text-sm font-bold transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                {deletando ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 size={15} className="animate-spin" /> Excluindo...
+                  </span>
+                ) : (
+                  <>
+                    <Trash2 size={15} />
+                    Excluir
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

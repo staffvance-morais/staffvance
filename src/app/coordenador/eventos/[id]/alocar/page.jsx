@@ -1,14 +1,10 @@
-"use client";
+﻿"use client";
+import { supabase } from "@/lib/supabase";
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import { ArrowLeft, Search, Check, Shield, Save, Loader2, Users } from "lucide-react";
 import { enviarEmailEscalacao } from "@/app/actions/email"; 
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 function AlocarEquipeConteudo() {
   const router = useRouter();

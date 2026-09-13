@@ -1,14 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 import HeaderSuperior from "@/components/HeaderSuperior";
 import { Search, Info, Plus, Filter, ChevronUp, Menu, User, Trash2, X, ZoomIn, AlertTriangle } from "lucide-react";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 export default function EquipeAdmin() {
   const router = useRouter();

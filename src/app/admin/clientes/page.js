@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 import { 
   Search, 
   Handshake, 
@@ -11,19 +11,15 @@ import {
   Filter, 
   ChevronUp, 
   Menu,
-  Loader2 
+  Loader2,
+  Trash2,
+  AlertTriangle
 } from "lucide-react";
-
-// Conexão com o Supabase
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 // ==========================================
 // COMPONENTE: CARD DO CLIENTE
 // ==========================================
-const ClienteCard = ({ id, nome, representante, foto, selected, router }) => {
+const ClienteCard = ({ id, nome, representante, foto, selected, router, onDeleteClick }) => {
   const [imgError, setImgError] = useState(false);
 
   return (
@@ -55,16 +51,31 @@ const ClienteCard = ({ id, nome, representante, foto, selected, router }) => {
           <p className="text-[#999999] text-[14px] mt-1">{representante}</p>
         </div>
         
-        {/* Botão de Info com FORÇAMENTO DE ROTA (Seguro e funcional) */}
-        <button 
-          onClick={(e) => {
-            e.preventDefault(); 
-            router.push(`/admin/clientes/${id}`);
-          }}
-          className="w-9 h-9 border border-[#444] rounded-sm bg-[#2a2a2a] flex items-center justify-center text-[#999] hover:bg-[#333] transition-colors cursor-pointer z-10"
-        >
-          <Info size={20} strokeWidth={1.5} />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Botão de Excluir */}
+          <button 
+            onClick={(e) => {
+              e.preventDefault();
+              onDeleteClick({ id, nome });
+            }}
+            title="Excluir cliente"
+            className="w-9 h-9 border border-[#442222] rounded-sm bg-[#2a1515] flex items-center justify-center text-red-500 hover:bg-red-950 hover:border-red-700 hover:text-red-300 transition-colors cursor-pointer z-10"
+          >
+            <Trash2 size={17} strokeWidth={1.8} />
+          </button>
+
+          {/* Botão de Info */}
+          <button 
+            onClick={(e) => {
+              e.preventDefault(); 
+              router.push(`/admin/clientes/${id}`);
+            }}
+            title="Ver detalhes"
+            className="w-9 h-9 border border-[#444] rounded-sm bg-[#2a2a2a] flex items-center justify-center text-[#999] hover:bg-[#333] transition-colors cursor-pointer z-10"
+          >
+            <Info size={20} strokeWidth={1.5} />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -79,39 +90,97 @@ export default function PainelClientes() {
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState("");
 
+  // Estado para exclusão
+  const [confirmDelete, setConfirmDelete] = useState(null); // { id, nome }
+  const [deletando, setDeletando] = useState(false);
+
   useEffect(() => {
-    const fetchClientes = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('clientes')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) {
-          console.warn("Aviso: Tabela de clientes vazia ou não encontrada.", error.message);
-          setClientes([]);
-          return;
-        }
-
-        if (data) {
-          const clientesFormatados = data.map(cli => ({
-            id: cli.id,
-            nome: cli.empresa || "Empresa não informada",
-            representante: cli.representante || "Sem representante", 
-            foto: (cli.foto_url && cli.foto_url.trim() !== "") ? cli.foto_url : null,
-            selected: false 
-          }));
-          setClientes(clientesFormatados);
-        }
-      } catch (error) {
-        console.error("Erro ao buscar clientes:", error.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchClientes();
   }, []);
+
+  const fetchClientes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn("Aviso: Tabela de clientes vazia ou não encontrada.", error.message);
+        setClientes([]);
+        return;
+      }
+
+      if (data) {
+        const clientesFormatados = data.map(cli => ({
+          id: cli.id,
+          nome: cli.empresa || "Empresa não informada",
+          representante: cli.representante || "Sem representante", 
+          foto: (cli.foto_url && cli.foto_url.trim() !== "") ? cli.foto_url : null,
+          selected: false 
+        }));
+        setClientes(clientesFormatados);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar clientes:", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirmarExclusao = async () => {
+    if (!confirmDelete) return;
+    setDeletando(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      let deletado = false;
+
+      // 1. Tenta deletar via API de admin com token
+      if (session?.access_token) {
+        const res = await fetch("/api/admin/deletar-cliente", {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ clienteId: confirmDelete.id }),
+        });
+
+        if (res.ok) {
+          deletado = true;
+        } else {
+          const json = await res.json().catch(() => ({}));
+          console.warn("Aviso rota API deletar cliente:", json.error);
+        }
+      }
+
+      // 2. Se a rota API falhou ou não tinha token de admin, tenta direto via client Supabase
+      if (!deletado) {
+        // Desvincula eventos primeiro
+        await supabase
+          .from("eventos")
+          .update({ cliente_id: null })
+          .eq("cliente_id", confirmDelete.id);
+
+        const { error: dbError } = await supabase
+          .from("clientes")
+          .delete()
+          .eq("id", confirmDelete.id);
+
+        if (dbError) throw dbError;
+      }
+
+      setClientes(prev => prev.filter(c => c.id !== confirmDelete.id));
+      setConfirmDelete(null);
+    } catch (err) {
+      console.error("Erro ao excluir cliente:", err);
+      alert("Erro ao excluir cliente: " + (err.message || "Tente novamente"));
+    } finally {
+      setDeletando(false);
+    }
+  };
 
   const clientesFiltrados = clientes.filter(cli => 
     cli.nome.toLowerCase().includes(busca.toLowerCase()) ||
@@ -143,7 +212,7 @@ export default function PainelClientes() {
 
         {/* CONTAGEM DE LISTA */}
         <div className="mt-4 mb-3 text-[14px] text-[#999999] tracking-wide shrink-0">
-          Listando {clientesFiltrados.length} de {clientes.length} - <span className="text-[#e5e5e5] font-semibold">0 selecionados</span>
+          Listando {clientesFiltrados.length} de {clientes.length}
         </div>
 
         {/* ÁREA DE ROLAGEM DOS CARDS */}
@@ -167,6 +236,7 @@ export default function PainelClientes() {
                 foto={cli.foto}
                 selected={cli.selected}
                 router={router}
+                onDeleteClick={(clienteInfo) => setConfirmDelete(clienteInfo)}
               />
             ))
           )}
@@ -212,6 +282,62 @@ export default function PainelClientes() {
         </div>
 
       </div>
+
+      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
+      {confirmDelete && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-6"
+          onClick={() => !deletando && setConfirmDelete(null)}
+        >
+          <div 
+            className="bg-[#1e1e1e] border border-[#3a3a3a] rounded-sm p-6 w-full max-w-xs flex flex-col gap-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-950 border border-red-800 rounded-sm flex items-center justify-center shrink-0">
+                <AlertTriangle size={20} className="text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-white font-bold text-base leading-tight">Excluir cliente</h3>
+                <p className="text-gray-400 text-xs mt-0.5">Esta ação não pode ser desfeita</p>
+              </div>
+            </div>
+
+            <p className="text-gray-300 text-sm leading-relaxed">
+              Deseja remover <strong className="text-white font-semibold">"{confirmDelete.nome}"</strong>? Somente prossiga se realmente não for mais trabalhar com este cliente.
+            </p>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(null)}
+                disabled={deletando}
+                className="flex-1 py-3 border border-[#444] bg-[#2a2a2a] text-gray-300 rounded-sm text-sm font-medium hover:bg-[#333] transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmarExclusao}
+                disabled={deletando}
+                className="flex-1 py-3 bg-red-700 hover:bg-red-600 text-white rounded-sm text-sm font-bold transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                {deletando ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 size={15} className="animate-spin" /> Excluindo...
+                  </span>
+                ) : (
+                  <>
+                    <Trash2 size={15} />
+                    Excluir
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

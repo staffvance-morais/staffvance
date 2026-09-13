@@ -32,7 +32,7 @@ const ROLE_MENUS = {
   coordenador: [
     { label: "Página inicial", href: "/coordenador", icon: Home },
     { label: "Equipe", href: "/coordenador/equipe", icon: Contact },
-    { label: "Clientes", href: "/admin/clientes", icon: Handshake },
+    { label: "Clientes", href: "/coordenador/clientes", icon: Handshake },
     { label: "Eventos", href: "/coordenador/eventos", icon: Calendar },
   ],
   staff: [
@@ -212,6 +212,7 @@ export default function AppNavigation({
                       key={idx}
                       as={Link}
                       href={item.href}
+                      prefetch={true}
                       onClick={() => setIsMenuOpen(false)}
                       variant="tertiary"
                       icon={Icon}

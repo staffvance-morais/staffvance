@@ -13,9 +13,9 @@ import {
   Wallet,
   GraduationCap,
   Shirt,
+  AlertCircle,
 } from "lucide-react";
 
-import { supabase } from "@/lib/supabase";
 import { maskCPF, maskPhone } from "@/lib/masks";
 
 import Alert from "@/components/Alert";
@@ -50,6 +50,7 @@ export default function Cadastro() {
     uniforme: "",
   });
 
+  const [errosCampos, setErrosCampos] = useState({});
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
   const [mensagem, setMensagem] = useState("");
@@ -68,40 +69,55 @@ export default function Cadastro() {
     const { name, value } = e.target;
     let formattedValue = value;
 
+    // Limpa erro específico do campo que o usuário está editando
+    if (errosCampos[name]) {
+      setErrosCampos((prev) => {
+        const novo = { ...prev };
+        delete novo[name];
+        return novo;
+      });
+    }
+
     if (name === "cpf") {
       formattedValue = maskCPF(value);
     } else if (name === "whatsapp") {
-      // Pega apenas os números digitados
       let rawDigits = value.replace(/\D/g, "");
-      // Se começar com zero (ex: 085), remove o zero
       if (rawDigits.startsWith("0")) {
         rawDigits = rawDigits.substring(1);
       }
       formattedValue = maskPhone(rawDigits);
     } else if (name === "dataNascimento") {
-      // Máscara automática de Data (DD/MM/AAAA)
       formattedValue = value
-        .replace(/\D/g, "") 
-        .replace(/(\d{2})(\d)/, "$1/$2") 
-        .replace(/(\d{2})(\d)/, "$1/$2") 
-        .replace(/(\d{4})\d+?$/, "$1"); 
+        .replace(/\D/g, "")
+        .replace(/(\d{2})(\d)/, "$1/$2")
+        .replace(/(\d{2})(\d)/, "$1/$2")
+        .replace(/(\d{4})\d+?$/, "$1");
     } else if (name === "nome") {
-      // Formatação automática do Nome (Iniciais maiúsculas)
       formattedValue = value
         .toLowerCase()
         .split(" ")
         .map((word) => {
-          if (word.length === 0) return word; // Mantém espaços extras enquanto digita
+          if (word.length === 0) return word;
           const preposicoes = ["de", "da", "do", "das", "dos", "e"];
-          // Mantém as preposições em minúsculo
           if (preposicoes.includes(word)) return word;
-          // Capitaliza a primeira letra do resto
           return word.charAt(0).toUpperCase() + word.slice(1);
         })
         .join(" ");
     }
 
     setForm((prev) => ({ ...prev, [name]: formattedValue }));
+  };
+
+  // Limpa erro de foto assim que uma foto válida é selecionada
+  const handleSetFotoArquivo = (arquivo) => {
+    setFotoArquivo(arquivo);
+    if (arquivo && errosCampos.foto) {
+      setErrosCampos((prev) => {
+        const novo = { ...prev };
+        delete novo.foto;
+        return novo;
+      });
+    }
   };
 
   const handleCadastro = async (e) => {
@@ -122,38 +138,80 @@ export default function Cadastro() {
       uniforme,
     } = form;
 
-    if (
-      !fotoArquivo ||
-      !email.trim() ||
-      !senha ||
-      !confirmarSenha ||
-      !nome.trim() ||
-      !cpf.trim() ||
-      !dataNascimento ||
-      !whatsapp.trim() ||
-      !chavePix.trim() ||
-      !curso ||
-      !uniforme
-    ) {
-      setErro("Todas as informações são obrigatórias.");
+    // 1. VALIDAÇÃO DETALHADA CAMPO A CAMPO (COM FEEDBACK VISUAL)
+    const novosErros = {};
+
+    if (!fotoArquivo && !fotoPreview) {
+      novosErros.foto = "Adicione uma foto de perfil nítida do seu rosto";
+    }
+
+    if (!email.trim()) {
+      novosErros.email = "Informe seu e-mail";
+    } else if (!email.includes("@") || !email.includes(".")) {
+      novosErros.email = "Formato de e-mail inválido";
+    }
+
+    if (!senha) {
+      novosErros.senha = "Crie uma senha de acesso";
+    } else if (senha.length < 6) {
+      novosErros.senha = "A senha deve ter no mínimo 6 caracteres";
+    }
+
+    if (!confirmarSenha) {
+      novosErros.confirmarSenha = "Confirme sua senha";
+    } else if (senha !== confirmarSenha) {
+      novosErros.confirmarSenha = "As senhas digitadas não coincidem";
+    }
+
+    if (!nome.trim()) {
+      novosErros.nome = "Informe seu nome completo";
+    } else if (nome.trim().split(" ").filter(Boolean).length < 2) {
+      novosErros.nome = "Por favor, digite seu nome e sobrenome";
+    }
+
+    const cpfNumeros = cpf.replace(/\D/g, "");
+    if (!cpf.trim()) {
+      novosErros.cpf = "Informe seu CPF";
+    } else if (cpfNumeros.length !== 11) {
+      novosErros.cpf = "CPF incompleto (são necessários 11 dígitos)";
+    }
+
+    if (!dataNascimento) {
+      novosErros.dataNascimento = "Informe sua data de nascimento";
+    } else if (dataNascimento.length !== 10) {
+      novosErros.dataNascimento = "Data incompleta (formato DD/MM/AAAA)";
+    }
+
+    const telNumeros = whatsapp.replace(/\D/g, "");
+    if (!whatsapp.trim()) {
+      novosErros.whatsapp = "Informe seu WhatsApp";
+    } else if (telNumeros.length < 10) {
+      novosErros.whatsapp = "WhatsApp incompleto (inclua o DDD)";
+    }
+
+    if (!chavePix.trim()) {
+      novosErros.chavePix = "Informe sua chave Pix para pagamento das diárias";
+    }
+
+    if (!curso) {
+      novosErros.curso = "Selecione se possui curso na área de segurança";
+    }
+
+    if (!uniforme) {
+      novosErros.uniforme = "Selecione o tamanho da sua camisa de uniforme";
+    }
+
+    if (Object.keys(novosErros).length > 0) {
+      setErrosCampos(novosErros);
+      const primeiroErro = Object.values(novosErros)[0];
+      setErro(primeiroErro);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
-    if (senha !== confirmarSenha) {
-      setErro("As senhas não coincidem!");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-
-    if (senha.length < 6) {
-      setErro("A senha deve ter no mínimo 6 caracteres.");
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-
+    // Validação do ReCAPTCHA (com aviso específico se faltar)
     if (recaptchaKey && !captchaValido) {
-      setErro("Por favor, confirme que você não é um robô.");
+      setErro("Por favor, marque a caixa 'Não sou um robô' para continuar.");
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
@@ -223,7 +281,7 @@ export default function Cadastro() {
         msg.toLowerCase().includes("already registered") ||
         msg.toLowerCase().includes("already in use")
       ) {
-        msg = "Este e-mail já está cadastrado no sistema.";
+        msg = "Este e-mail já está cadastrado no sistema. Faça login com sua senha.";
       } else if (msg.toLowerCase().includes("password")) {
         msg = "A senha deve ter no mínimo 6 caracteres.";
       } else if (msg.toLowerCase().includes("network") || msg.toLowerCase().includes("fetch")) {
@@ -243,145 +301,253 @@ export default function Cadastro() {
       <div className="flex w-full flex-col items-center gap-4">
         <HeaderSuperior />
 
-        <Alert variant="error">{erro}</Alert>
-        <Alert variant="success">{mensagem}</Alert>
+        {erro && (
+          <Alert variant="error">
+            <div className="flex items-center gap-2">
+              <AlertCircle size={18} className="shrink-0 text-red-400" />
+              <span>{erro}</span>
+            </div>
+          </Alert>
+        )}
+
+        {mensagem && <Alert variant="success">{mensagem}</Alert>}
 
         <form onSubmit={handleCadastro} className="flex w-full flex-col gap-4">
+          
+          {/* FOTO DE PERFIL */}
           <div className="flex w-full flex-col gap-2">
             <FormSectionHeader title="Foto de Perfil" />
             <FormNotice>
-              A foto deve conter o seu rosto 100% visível.
+              A foto deve conter o seu rosto 100% visível (estilo documento/crachá).
             </FormNotice>
 
             <PhotoUpload
               fotoPreview={fotoPreview}
               setFotoPreview={setFotoPreview}
-              setFotoArquivo={setFotoArquivo}
+              setFotoArquivo={handleSetFotoArquivo}
               isCompressing={comprimindo}
               setIsCompressing={setComprimindo}
               onError={setErro}
+              hasError={!!errosCampos.foto}
             />
+            {errosCampos.foto && (
+              <span className="text-xs text-red-400 font-semibold ml-1">
+                * {errosCampos.foto}
+              </span>
+            )}
           </div>
 
+          {/* ACESSO AO APP */}
           <div className="flex w-full flex-col gap-3">
             <FormSectionHeader title="Acesso ao App" />
-            <FormInput
-              icon={Mail}
-              type="email"
-              name="email"
-              value={form.email}
-              onChange={handleChange}
-              placeholder="E-mail"
-              autoComplete="email"
-            />
-            <FormInput
-              icon={LockKeyhole}
-              type="password"
-              name="senha"
-              value={form.senha}
-              onChange={handleChange}
-              placeholder="Senha"
-              minLength={6}
-              autoComplete="new-password"
-            />
-            <FormInput
-              icon={LockKeyhole}
-              type="password"
-              name="confirmarSenha"
-              value={form.confirmarSenha}
-              onChange={handleChange}
-              placeholder="Confirmar senha"
-              minLength={6}
-              autoComplete="new-password"
-            />
+            
+            <div>
+              <FormInput
+                icon={Mail}
+                type="email"
+                name="email"
+                value={form.email}
+                onChange={handleChange}
+                placeholder="E-mail"
+                autoComplete="email"
+                className={errosCampos.email ? "!border-red-500 bg-red-950/20" : ""}
+              />
+              {errosCampos.email && (
+                <span className="text-xs text-red-400 font-semibold ml-1 block mt-1">
+                  * {errosCampos.email}
+                </span>
+              )}
+            </div>
+
+            <div>
+              <FormInput
+                icon={LockKeyhole}
+                type="password"
+                name="senha"
+                value={form.senha}
+                onChange={handleChange}
+                placeholder="Senha (mínimo 6 dígitos)"
+                minLength={6}
+                autoComplete="new-password"
+                className={errosCampos.senha ? "!border-red-500 bg-red-950/20" : ""}
+              />
+              {errosCampos.senha && (
+                <span className="text-xs text-red-400 font-semibold ml-1 block mt-1">
+                  * {errosCampos.senha}
+                </span>
+              )}
+            </div>
+
+            <div>
+              <FormInput
+                icon={LockKeyhole}
+                type="password"
+                name="confirmarSenha"
+                value={form.confirmarSenha}
+                onChange={handleChange}
+                placeholder="Confirmar senha"
+                minLength={6}
+                autoComplete="new-password"
+                className={errosCampos.confirmarSenha ? "!border-red-500 bg-red-950/20" : ""}
+              />
+              {errosCampos.confirmarSenha && (
+                <span className="text-xs text-red-400 font-semibold ml-1 block mt-1">
+                  * {errosCampos.confirmarSenha}
+                </span>
+              )}
+            </div>
           </div>
 
+          {/* DADOS PESSOAIS */}
           <div className="flex w-full flex-col gap-3">
             <FormSectionHeader title="Dados Pessoais" />
-            <FormInput
-              icon={Contact}
-              type="text"
-              name="nome"
-              value={form.nome}
-              onChange={handleChange}
-              placeholder="Nome completo"
-              autoComplete="name"
-            />
-            <FormInput
-              icon={Landmark}
-              type="text"
-              name="cpf"
-              value={form.cpf}
-              onChange={handleChange}
-              placeholder="CPF"
-              maxLength={14}
-            />
-            <FormInput
-              icon={CalendarFold}
-              type="text"
-              name="dataNascimento"
-              value={form.dataNascimento}
-              onChange={handleChange}
-              placeholder="DD/MM/AAAA"
-              maxLength={10}
-            />
-            <FormInput
-              icon={Smartphone}
-              type="tel"
-              name="whatsapp"
-              value={form.whatsapp}
-              onChange={handleChange}
-              placeholder="WhatsApp"
-              autoComplete="tel"
-              maxLength={15}
-            />
-            <FormInput
-              icon={Wallet}
-              type="text"
-              name="chavePix"
-              value={form.chavePix}
-              onChange={handleChange}
-              placeholder="Chave Pix"
-            />
+            
+            <div>
+              <FormInput
+                icon={Contact}
+                type="text"
+                name="nome"
+                value={form.nome}
+                onChange={handleChange}
+                placeholder="Nome completo"
+                autoComplete="name"
+                className={errosCampos.nome ? "!border-red-500 bg-red-950/20" : ""}
+              />
+              {errosCampos.nome && (
+                <span className="text-xs text-red-400 font-semibold ml-1 block mt-1">
+                  * {errosCampos.nome}
+                </span>
+              )}
+            </div>
+
+            <div>
+              <FormInput
+                icon={Landmark}
+                type="text"
+                name="cpf"
+                value={form.cpf}
+                onChange={handleChange}
+                placeholder="CPF"
+                maxLength={14}
+                className={errosCampos.cpf ? "!border-red-500 bg-red-950/20" : ""}
+              />
+              {errosCampos.cpf && (
+                <span className="text-xs text-red-400 font-semibold ml-1 block mt-1">
+                  * {errosCampos.cpf}
+                </span>
+              )}
+            </div>
+
+            <div>
+              <FormInput
+                icon={CalendarFold}
+                type="text"
+                name="dataNascimento"
+                value={form.dataNascimento}
+                onChange={handleChange}
+                placeholder="Data de nascimento (DD/MM/AAAA)"
+                maxLength={10}
+                className={errosCampos.dataNascimento ? "!border-red-500 bg-red-950/20" : ""}
+              />
+              {errosCampos.dataNascimento && (
+                <span className="text-xs text-red-400 font-semibold ml-1 block mt-1">
+                  * {errosCampos.dataNascimento}
+                </span>
+              )}
+            </div>
+
+            <div>
+              <FormInput
+                icon={Smartphone}
+                type="tel"
+                name="whatsapp"
+                value={form.whatsapp}
+                onChange={handleChange}
+                placeholder="WhatsApp (com DDD)"
+                autoComplete="tel"
+                maxLength={15}
+                className={errosCampos.whatsapp ? "!border-red-500 bg-red-950/20" : ""}
+              />
+              {errosCampos.whatsapp && (
+                <span className="text-xs text-red-400 font-semibold ml-1 block mt-1">
+                  * {errosCampos.whatsapp}
+                </span>
+              )}
+            </div>
+
+            <div>
+              <FormInput
+                icon={Wallet}
+                type="text"
+                name="chavePix"
+                value={form.chavePix}
+                onChange={handleChange}
+                placeholder="Chave Pix (para diárias)"
+                className={errosCampos.chavePix ? "!border-red-500 bg-red-950/20" : ""}
+              />
+              {errosCampos.chavePix && (
+                <span className="text-xs text-red-400 font-semibold ml-1 block mt-1">
+                  * {errosCampos.chavePix}
+                </span>
+              )}
+            </div>
           </div>
 
+          {/* DADOS PROFISSIONAIS */}
           <div className="flex w-full flex-col gap-3">
             <FormSectionHeader title="Dados Profissionais" />
-            <FormSelect
-              icon={GraduationCap}
-              name="curso"
-              value={form.curso}
-              onChange={handleChange}
-            >
-              <option value="" disabled hidden>
-                Possui curso?
-              </option>
-              <option value="nenhum">
-                Não possuo nenhum curso em Segurança
-              </option>
-              <option value="apoio">
-                Possuo curso de Apoio e Segurança em Eventos
-              </option>
-              <option value="extensao">
-                Possuo extensão para Grandes Eventos
-              </option>
-            </FormSelect>
+            
+            <div>
+              <FormSelect
+                icon={GraduationCap}
+                name="curso"
+                value={form.curso}
+                onChange={handleChange}
+                hasError={!!errosCampos.curso}
+              >
+                <option value="" disabled hidden>
+                  Possui curso de segurança?
+                </option>
+                <option value="nenhum">
+                  Não possuo nenhum curso em Segurança
+                </option>
+                <option value="apoio">
+                  Possuo curso de Apoio e Segurança em Eventos
+                </option>
+                <option value="extensao">
+                  Possuo extensão para Grandes Eventos
+                </option>
+              </FormSelect>
+              {errosCampos.curso && (
+                <span className="text-xs text-red-400 font-semibold ml-1 block mt-1">
+                  * {errosCampos.curso}
+                </span>
+              )}
+            </div>
 
-            <FormSelect
-              icon={Shirt}
-              name="uniforme"
-              value={form.uniforme}
-              onChange={handleChange}
-            >
-              <option value="" disabled hidden>
-                Uniforme
-              </option>
-              <option value="pp">Camisa de tamanho PP</option>
-              <option value="p">Camisa de tamanho P</option>
-              <option value="m">Camisa de tamanho M</option>
-              <option value="g">Camisa de tamanho G</option>
-              <option value="gg">Camisa de tamanho GG</option>
-            </FormSelect>
+            <div>
+              <FormSelect
+                icon={Shirt}
+                name="uniforme"
+                value={form.uniforme}
+                onChange={handleChange}
+                hasError={!!errosCampos.uniforme}
+              >
+                <option value="" disabled hidden>
+                  Tamanho do Uniforme (Camisa)
+                </option>
+                <option value="pp">Camisa de tamanho PP</option>
+                <option value="p">Camisa de tamanho P</option>
+                <option value="m">Camisa de tamanho M</option>
+                <option value="g">Camisa de tamanho G</option>
+                <option value="gg">Camisa de tamanho GG</option>
+              </FormSelect>
+              {errosCampos.uniforme && (
+                <span className="text-xs text-red-400 font-semibold ml-1 block mt-1">
+                  * {errosCampos.uniforme}
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex w-full flex-col gap-1">

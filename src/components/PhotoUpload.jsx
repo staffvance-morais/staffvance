@@ -12,6 +12,7 @@ export default function PhotoUpload({
   isCompressing,
   setIsCompressing,
   onError,
+  hasError = false,
 }) {
   const fileInputRef = useRef(null);
 
@@ -57,7 +58,9 @@ export default function PhotoUpload({
   };
 
   return (
-    <div className="relative flex w-full items-end justify-between border-2 border-neutral-700 bg-neutral-800 p-4">
+    <div className={`relative flex w-full items-end justify-between border-2 p-4 transition-colors ${
+      hasError ? "border-red-500 bg-red-950/20" : "border-neutral-700 bg-neutral-800"
+    }`}>
       <div
         onClick={handleClick}
         className="relative flex h-48 w-48 cursor-pointer items-center justify-center overflow-hidden border border-neutral-400 bg-white transition-opacity hover:opacity-90"

@@ -9,17 +9,30 @@ import {
   Shield,
   CheckCircle2,
   Map,
+  Camera,
+  Check,
+  CheckCheck,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import HeaderSuperior from "@/components/HeaderSuperior";
 import AppNavigation from "@/components/AppNavigation";
 import SolidButton from "@/components/SolidButton";
+import CameraPontoModal from "@/components/CameraPontoModal";
 
 export default function MinhasEscalas() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [escalas, setEscalas] = useState([]);
   const [perfil, setPerfil] = useState(null);
+  const [modalPontoAberto, setModalPontoAberto] = useState(false);
+  const [modalPontoTipo, setModalPontoTipo] = useState("checkin");
+  const [escalaParaPonto, setEscalaParaPonto] = useState(null);
+
+  const abrirPonto = (escala, tipo) => {
+    setEscalaParaPonto(escala);
+    setModalPontoTipo(tipo);
+    setModalPontoAberto(true);
+  };
 
   useEffect(() => {
     async function fetchMinhasEscalas() {
@@ -48,6 +61,11 @@ export default function MinhasEscalas() {
             id,
             setor,
             status_pagamento,
+            status_presenca,
+            checkin_em,
+            checkin_foto_url,
+            checkout_em,
+            checkout_foto_url,
             eventos (
               id,
               titulo,
@@ -198,6 +216,67 @@ export default function MinhasEscalas() {
                     </SolidButton>
                   )}
 
+                  {/* PONTO ELETRÔNICO DO EVENTO */}
+                  <div className="border border-neutral-700 bg-neutral-900/60 p-3 rounded space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-bold text-neutral-400 flex items-center gap-1">
+                        <Camera size={12} className="text-blue-400" />
+                        Ponto Eletrônico
+                      </span>
+                      {escala.status_presenca === "presente" || escala.checkin_em ? (
+                        <span className="text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded text-[10px] flex items-center gap-1">
+                          <Check size={10} /> Presente
+                        </span>
+                      ) : (
+                        <span className="text-neutral-500 text-[10px]">Aguardando</span>
+                      )}
+                    </div>
+
+                    {escala.checkin_em && (
+                      <div className="text-[11px] bg-neutral-900 p-2 rounded border border-neutral-800 space-y-1">
+                        <div className="flex justify-between text-neutral-300">
+                          <span className="text-neutral-500">Entrada:</span>
+                          <span className="font-mono text-emerald-400 font-bold">
+                            {new Date(escala.checkin_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                        {escala.checkout_em && (
+                          <div className="flex justify-between text-neutral-300 pt-1 border-t border-neutral-800">
+                            <span className="text-neutral-500">Saída:</span>
+                            <span className="font-mono text-blue-400 font-bold">
+                              {new Date(escala.checkout_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {!escala.checkin_em ? (
+                      <button
+                        type="button"
+                        onClick={() => abrirPonto(escala, "checkin")}
+                        className="w-full bg-[#2563eb] hover:bg-[#1d4ed8] text-white py-2 rounded text-[12px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Camera size={14} />
+                        <span>Confirmar Chegada (Selfie)</span>
+                      </button>
+                    ) : !escala.checkout_em ? (
+                      <button
+                        type="button"
+                        onClick={() => abrirPonto(escala, "checkout")}
+                        className="w-full bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/40 py-2 rounded text-[12px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Clock size={14} />
+                        <span>Registrar Saída</span>
+                      </button>
+                    ) : (
+                      <div className="text-center py-0.5 text-[11px] text-neutral-400 flex items-center justify-center gap-1">
+                        <CheckCheck size={13} className="text-emerald-400" />
+                        <span>Presença finalizada</span>
+                      </div>
+                    )}
+                  </div>
+
                   {escala.status_pagamento && (
                     <div className="border border-green-600/30 bg-green-950/30 px-3 py-1 text-center text-xs font-bold uppercase text-green-400">
                       Pagamento Liberado
@@ -211,6 +290,31 @@ export default function MinhasEscalas() {
       </main>
 
       <AppNavigation userProfile={perfil} userRole="staff" />
+
+      {/* MODAL DE PONTO */}
+      <CameraPontoModal
+        isOpen={modalPontoAberto}
+        onClose={() => setModalPontoAberto(false)}
+        escalaId={escalaParaPonto?.id}
+        eventoTitulo={escalaParaPonto?.eventos?.titulo}
+        tipo={modalPontoTipo}
+        onSucesso={(res) => {
+          setEscalas((prev) =>
+            prev.map((e) =>
+              e.id === escalaParaPonto?.id
+                ? {
+                    ...e,
+                    status_presenca: "presente",
+                    checkin_em: modalPontoTipo === "checkin" ? res.horario : e.checkin_em,
+                    checkout_em: modalPontoTipo === "checkout" ? res.horario : e.checkout_em,
+                    checkin_foto_url: modalPontoTipo === "checkin" ? res.fotoUrl : e.checkin_foto_url,
+                    checkout_foto_url: modalPontoTipo === "checkout" ? res.fotoUrl : e.checkout_foto_url,
+                  }
+                : e
+            )
+          );
+        }}
+      />
     </div>
   );
 }

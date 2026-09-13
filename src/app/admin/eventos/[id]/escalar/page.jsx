@@ -1,14 +1,8 @@
 "use client";
+import { supabase } from "@/lib/supabase";
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import { CalendarDays, ChevronRight, User, Info, Menu, Loader2 } from "lucide-react";
-
-// Conexão com o Supabase
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 export default function SelecionarSetorEscala() {
   const router = useRouter();
@@ -17,6 +11,7 @@ export default function SelecionarSetorEscala() {
 
   const [loading, setLoading] = useState(true);
   const [salvandoSetor, setSalvandoSetor] = useState(false);
+  const [enviandoRelatorio, setEnviandoRelatorio] = useState(false);
   const [escalas, setEscalas] = useState([]);
   
   // Lista padrão de fábrica
@@ -29,7 +24,6 @@ export default function SelecionarSetorEscala() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 1. Busca os staffs já alocados (CORRIGIDO: Removido o 'nome' que estava quebrando o Supabase)
         const { data: escalasData, error: escalasError } = await supabase
           .from("escalas")
           .select("id, setor, staff_id, perfis ( id, nome_completo )")
@@ -41,8 +35,7 @@ export default function SelecionarSetorEscala() {
           setEscalas(escalasData);
         }
 
-        // 2. Busca os setores extras que foram adicionados pelo usuário no banco
-        const { data: eventoData, error: eventoError } = await supabase
+        const { data: eventoData } = await supabase
           .from("eventos")
           .select("setores_extras")
           .eq("id", eventoId)
@@ -50,7 +43,6 @@ export default function SelecionarSetorEscala() {
 
         let todosOsSetores = [...setores];
 
-        // Se houver setores extras salvos na coluna nova (jsonb)
         if (eventoData && eventoData.setores_extras) {
           const extrasDoBanco = eventoData.setores_extras;
           extrasDoBanco.forEach(setorExtra => {
@@ -60,7 +52,6 @@ export default function SelecionarSetorEscala() {
           });
         }
         
-        // Também verifica se tem algum setor nas escalas que não está na lista
         if (escalasData) {
           const setoresNasEscalas = escalasData.map(e => e.setor).filter(Boolean);
           setoresNasEscalas.forEach(s => {
@@ -79,7 +70,6 @@ export default function SelecionarSetorEscala() {
     if (eventoId) fetchData();
   }, [eventoId]);
 
-  // Função para adicionar e SALVAR o setor no banco
   const handleAdicionarSetor = async () => {
     const novoSetor = window.prompt("Digite o nome do novo setor:");
     if (novoSetor && novoSetor.trim() !== "") {
@@ -92,21 +82,18 @@ export default function SelecionarSetorEscala() {
 
       setSalvandoSetor(true);
       try {
-        // 1. Atualiza a tela imediatamente para o Morais ver
         const novaListaSetores = [nomeLimpo, ...setores];
         setSetores(novaListaSetores);
 
-        // 2. Busca os extras atuais do banco e adiciona o novo
         const { data: evData } = await supabase.from('eventos').select('setores_extras').eq('id', eventoId).single();
         const extrasAtuais = evData?.setores_extras || [];
         const extrasAtualizados = [...extrasAtuais, nomeLimpo];
 
-        // 3. Salva a nova lista no banco na coluna jsonb
         await supabase.from('eventos').update({ setores_extras: extrasAtualizados }).eq('id', eventoId);
         
       } catch (error) {
         console.error("Erro ao salvar o setor extra no banco:", error);
-        alert("Erro ao salvar. Verifique se você criou a coluna 'setores_extras' do tipo JSONB na tabela 'eventos'.");
+        alert("Erro ao salvar.");
       } finally {
         setSalvandoSetor(false);
       }
@@ -114,6 +101,22 @@ export default function SelecionarSetorEscala() {
   };
 
   const totalEscaladosGeral = escalas.length;
+
+  const handleConcluir = async () => {
+    setEnviandoRelatorio(true);
+    try {
+      await fetch("/api/resumo-camisas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventoId }),
+      });
+    } catch (err) {
+      console.error("Erro ao enviar relatorio de camisas:", err);
+    } finally {
+      setEnviandoRelatorio(false);
+      router.push(`/admin/eventos/${eventoId}`);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#171717] font-sans flex flex-col items-center pb-10">
@@ -130,7 +133,7 @@ export default function SelecionarSetorEscala() {
 
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 text-[#777]">
-              <Loader2 className="animate-spin mb-2" size={28} />
+              <Loader2 className="animate-spin mb-2 text-[#2563eb]" size={28} />
               <p className="text-sm">Carregando setores...</p>
             </div>
           ) : (
@@ -194,10 +197,18 @@ export default function SelecionarSetorEscala() {
 
             {totalEscaladosGeral > 0 ? (
               <button 
-                onClick={() => router.push(`/admin/eventos/${eventoId}`)}
-                className="w-full bg-[#16a34a] hover:bg-[#15803d] text-white font-bold py-3.5 rounded-sm transition-colors cursor-pointer text-[16px]"
+                onClick={handleConcluir}
+                disabled={enviandoRelatorio}
+                className="w-full bg-[#16a34a] hover:bg-[#15803d] text-white font-bold py-3.5 rounded-sm transition-colors cursor-pointer text-[16px] flex items-center justify-center gap-2"
               >
-                Concluir
+                {enviandoRelatorio ? (
+                  <>
+                    <Loader2 className="animate-spin" size={20} />
+                    <span>Enviando relatório...</span>
+                  </>
+                ) : (
+                  "Concluir"
+                )}
               </button>
             ) : (
               <button 

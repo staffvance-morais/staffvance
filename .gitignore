@@ -33,3 +33,5 @@ pnpm-debug.log*
 next-env.d.ts
 # Test coverage
 coverage/
+# Local Netlify folder
+.netlify
