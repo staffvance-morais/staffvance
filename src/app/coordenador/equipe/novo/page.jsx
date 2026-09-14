@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import HeaderSuperior from "@/components/HeaderSuperior";
+import imageCompression from "browser-image-compression";
 import { 
   Contact2, 
   ChevronRight,
@@ -22,7 +23,8 @@ import {
   PenLine,
   Shield,
   Menu,
-  DollarSign
+  DollarSign,
+  Loader2
 } from "lucide-react";
 
 export default function CadastrarFuncionarioCoordenador() {
@@ -39,6 +41,8 @@ export default function CadastrarFuncionarioCoordenador() {
   const [pix, setPix] = useState("");
   const [observacao, setObservacao] = useState("");
   const [fotoUrl, setFotoUrl] = useState("");
+  const [fotoArquivo, setFotoArquivo] = useState(null);
+  const [comprimindo, setComprimindo] = useState(false);
 
   // Estados dos selects customizados
   const [cargo, setCargo] = useState("");
@@ -63,18 +67,29 @@ export default function CadastrarFuncionarioCoordenador() {
     fileInputRef.current?.click();
   };
 
-  // Captura o arquivo de imagem selecionado
-  const handleFotoChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const imageUrl = URL.createObjectURL(file);
-      setFotoUrl(imageUrl);
+  // Captura e comprime o arquivo de imagem selecionado
+  const handleFotoChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setComprimindo(true);
+    try {
+      const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1024, useWebWorker: false };
+      const compressedFile = await imageCompression(file, options);
+      setFotoArquivo(compressedFile);
+      setFotoUrl(URL.createObjectURL(compressedFile));
+    } catch (err) {
+      console.error("Erro ao comprimir imagem:", err);
+      alert("Erro ao processar imagem de perfil.");
+    } finally {
+      setComprimindo(false);
     }
   };
 
   // Remove a foto selecionada
   const handleRemoveFoto = () => {
     setFotoUrl("");
+    setFotoArquivo(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -82,9 +97,23 @@ export default function CadastrarFuncionarioCoordenador() {
 
   const handleCadastro = async (e) => {
     e.preventDefault();
+    if (comprimindo) {
+      alert("Aguarde a foto terminar de ser processada.");
+      return;
+    }
     setLoading(true);
 
     try {
+      let fotoBase64 = null;
+      if (fotoArquivo) {
+        fotoBase64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(fotoArquivo);
+        });
+      }
+
       const response = await fetch('/api/cadastrar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -100,7 +129,7 @@ export default function CadastrarFuncionarioCoordenador() {
           emblema: nivel || "Bronze",
           tamanho_camisa: tamanho || null,
           observacoes: observacao || null,
-          foto_url: fotoUrl || null
+          foto_base64: fotoBase64,
         }),
       });
 
@@ -148,7 +177,12 @@ export default function CadastrarFuncionarioCoordenador() {
           
           <div className="border border-[#333] p-3 flex justify-between bg-[#1a1a1a]">
             <div className="w-32 h-32 bg-white flex-shrink-0 flex items-center justify-center text-center p-2 overflow-hidden">
-              {fotoUrl ? (
+              {comprimindo ? (
+                <div className="flex flex-col items-center justify-center text-blue-600 gap-1">
+                  <Loader2 className="animate-spin" size={24} />
+                  <span className="text-[10px] font-bold text-gray-700">Comprimindo...</span>
+                </div>
+              ) : fotoUrl ? (
                 <img src={fotoUrl} alt="Perfil" className="w-full h-full object-cover" />
               ) : (
                 <span className="text-xs text-gray-400 font-medium">Sem foto</span>
@@ -397,10 +431,10 @@ export default function CadastrarFuncionarioCoordenador() {
           <div className="flex flex-col gap-3 mt-4">
             <button 
               type="submit"
-              disabled={loading}
-              className="w-full bg-[#10b981] hover:bg-[#059669] text-white font-bold text-lg py-4 flex items-center justify-center transition-colors"
+              disabled={loading || comprimindo}
+              className="w-full bg-[#10b981] hover:bg-[#059669] disabled:opacity-50 text-white font-bold text-lg py-4 flex items-center justify-center transition-colors"
             >
-              {loading ? "Cadastrando..." : "Cadastrar"}
+              {loading ? "Cadastrando..." : comprimindo ? "Processando foto..." : "Cadastrar"}
             </button>
             
             <button 

@@ -73,13 +73,10 @@ export default function PerfilDetalhado() {
       const payload = { 
         userId: perfilId,
         classificacao, 
-        anotacoes 
+        anotacoes,
+        role,
+        cargo: role
       };
-
-      if (isAdmin) {
-        payload.role = role;
-        payload.cargo = role; // Mantém a coluna cargo sincronizada com o papel
-      }
 
       const res = await fetch("/api/atualizar-usuario", {
         method: "PUT",
@@ -97,7 +94,8 @@ export default function PerfilDetalhado() {
         ...prev, 
         classificacao, 
         anotacoes,
-        ...(isAdmin ? { role, cargo: role } : {})
+        role,
+        cargo: role
       }));
       setEditMode(false);
     } catch (error) { 
@@ -215,7 +213,7 @@ export default function PerfilDetalhado() {
               <p className="text-[#999] text-[13px] mb-3 flex items-center gap-2">
                 <ShieldCheck size={16} className="text-[#2563eb]"/> Cargo / Função no Sistema:
               </p>
-              {editMode && isAdmin ? (
+              {editMode ? (
                 <div className="flex gap-3">
                   {[
                     { key: 'staff', label: 'Staff' },

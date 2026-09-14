@@ -55,6 +55,7 @@ export default function Cadastro() {
   const [erro, setErro] = useState("");
   const [mensagem, setMensagem] = useState("");
   const [captchaValido, setCaptchaValido] = useState(false);
+  const [autorizoImagem, setAutorizoImagem] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState("termos");
 
@@ -244,6 +245,7 @@ export default function Cadastro() {
           curso,
           uniforme,
           foto_base64: fotoBase64,
+          autorizo_imagem: autorizoImagem,
         }),
       });
 
@@ -264,6 +266,7 @@ export default function Cadastro() {
             dataNascimento,
             curso,
             uniforme,
+            autorizoImagem,
           }),
         });
       } catch (emailError) {
@@ -548,6 +551,28 @@ export default function Cadastro() {
                 </span>
               )}
             </div>
+          </div>
+
+          {/* TERMO DE AUTORIZAÇÃO DE USO DE IMAGEM */}
+          <div className="flex items-start gap-3 p-3.5 rounded border border-neutral-700/80 bg-neutral-900/60 transition-colors hover:border-neutral-600">
+            <input
+              type="checkbox"
+              id="autorizoImagem"
+              name="autorizoImagem"
+              checked={autorizoImagem}
+              onChange={(e) => setAutorizoImagem(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-neutral-600 bg-neutral-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer accent-blue-600"
+            />
+            <label htmlFor="autorizoImagem" className="text-xs sm:text-sm text-neutral-300 leading-snug cursor-pointer select-none">
+              Autorizo o uso da minha imagem nos eventos para as mídias sociais e divulgação institucional.{" "}
+              <button
+                type="button"
+                onClick={() => openLegalModal("imagem")}
+                className="cursor-pointer text-blue-400 hover:text-blue-300 underline font-medium inline-block ml-0.5"
+              >
+                (Ler mais sobre o termo)
+              </button>
+            </label>
           </div>
 
           <div className="flex w-full flex-col gap-1">

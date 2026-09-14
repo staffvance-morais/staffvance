@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { supabase } from "@/lib/supabase";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -32,7 +32,7 @@ export default function EquipeCoordenador() {
     const { data, error } = await supabase
       .from("perfis")
       .select("*")
-      .ilike("role", "%staff%") 
+      .neq("role", "admin")
       .order("nome_completo", { ascending: true });
 
     if (error) {

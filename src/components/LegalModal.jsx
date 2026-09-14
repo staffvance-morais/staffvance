@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import Divider from "./Divider";
 import SolidButton from "./SolidButton";
-import { TERMOS_DE_SERVICO, POLITICA_DE_PRIVACIDADE } from "@/lib/legalContent";
+import { TERMOS_DE_SERVICO, POLITICA_DE_PRIVACIDADE, TERMO_USO_IMAGEM } from "@/lib/legalContent";
 
 export default function LegalModal({
   isOpen = false,
@@ -14,7 +14,11 @@ export default function LegalModal({
   const modalContentRef = useRef(null);
 
   const data =
-    type === "privacidade" ? POLITICA_DE_PRIVACIDADE : TERMOS_DE_SERVICO;
+    type === "privacidade"
+      ? POLITICA_DE_PRIVACIDADE
+      : type === "imagem"
+      ? TERMO_USO_IMAGEM
+      : TERMOS_DE_SERVICO;
 
   useEffect(() => {
     function handleKeyDown(e) {

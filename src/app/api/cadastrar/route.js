@@ -32,6 +32,7 @@ export async function POST(request) {
       uniforme,
       foto_url,
       foto_base64,
+      autorizo_imagem,
     } = body;
 
     const emailLimpo = (email || "").trim().toLowerCase();
@@ -89,6 +90,7 @@ export async function POST(request) {
           nome_completo: nomeLimpo,
           cpf: cpfLimpo,
           role: "staff",
+          autorizo_imagem: typeof autorizo_imagem === "boolean" ? autorizo_imagem : true,
         },
       });
 
@@ -127,6 +129,7 @@ export async function POST(request) {
               nome_completo: nomeLimpo,
               cpf: cpfLimpo,
               role: "staff",
+              autorizo_imagem: typeof autorizo_imagem === "boolean" ? autorizo_imagem : true,
             },
           });
           userId = userOrfao.id;

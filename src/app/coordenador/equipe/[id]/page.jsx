@@ -32,6 +32,7 @@ export default function DetalhesStaffCoordenador() {
   // Estados Editáveis
   const [classificacao, setClassificacao] = useState("");
   const [anotacoes, setAnotacoes] = useState("");
+  const [role, setRole] = useState("staff");
 
   useEffect(() => {
     const fetchPerfil = async () => {
@@ -51,6 +52,7 @@ export default function DetalhesStaffCoordenador() {
           setPerfil(data);
           setClassificacao(data.classificacao || "");
           setAnotacoes(data.anotacoes || "");
+          setRole(data.role || "staff");
         }
       } catch (error) { 
         console.error(error); 
@@ -70,7 +72,9 @@ export default function DetalhesStaffCoordenador() {
       const payload = { 
         userId: perfilId,
         classificacao, 
-        anotacoes 
+        anotacoes,
+        role,
+        cargo: role
       };
 
       const res = await fetch("/api/atualizar-usuario", {
@@ -88,7 +92,9 @@ export default function DetalhesStaffCoordenador() {
       setPerfil(prev => ({ 
         ...prev, 
         classificacao, 
-        anotacoes
+        anotacoes,
+        role,
+        cargo: role
       }));
       setEditMode(false);
     } catch (error) { 
@@ -145,7 +151,7 @@ export default function DetalhesStaffCoordenador() {
             )}
           </div>
           <h2 className="text-[22px] font-bold text-white capitalize">{perfil?.nome_completo || "Sem Nome"}</h2>
-          <p className="text-[#2563eb] uppercase tracking-widest text-[12px] font-bold mt-1">{perfil?.role || 'staff'}</p>
+          <p className="text-[#2563eb] uppercase tracking-widest text-[12px] font-bold mt-1">{perfil?.role || role || 'staff'}</p>
         </div>
 
         {/* Dados Cadastrais Completos */}
@@ -221,15 +227,37 @@ export default function DetalhesStaffCoordenador() {
               <p className="text-[#999] text-[13px] mb-3 flex items-center gap-2">
                 <ShieldCheck size={16} className="text-[#2563eb]"/> Cargo / Função no Sistema:
               </p>
-              <span className={`inline-block px-4 py-1.5 rounded-sm font-bold text-[13px] uppercase tracking-wider ${
-                perfil?.role === 'coordenador' 
-                  ? 'bg-purple-900/40 text-purple-300 border border-purple-600/50' 
-                  : perfil?.role === 'admin' 
-                    ? 'bg-red-900/40 text-red-300 border border-red-600/50' 
-                    : 'bg-blue-900/40 text-blue-300 border border-blue-600/50'
-              }`}>
-                {perfil?.role || 'staff'}
-              </span>
+              {editMode ? (
+                <div className="flex gap-3">
+                  {[
+                    { key: 'staff', label: 'Staff' },
+                    { key: 'coordenador', label: 'Coordenador' }
+                  ].map(r => (
+                    <button 
+                      key={r.key} 
+                      type="button"
+                      onClick={() => setRole(r.key)} 
+                      className={`px-4 py-2 rounded-sm border font-bold text-[13px] transition-colors cursor-pointer ${
+                        role === r.key 
+                          ? 'bg-[#2563eb] border-[#2563eb] text-white shadow-md' 
+                          : 'border-[#444] text-[#777] hover:bg-[#333] hover:text-white'
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <span className={`inline-block px-4 py-1.5 rounded-sm font-bold text-[13px] uppercase tracking-wider ${
+                  role === 'coordenador' 
+                    ? 'bg-purple-900/40 text-purple-300 border border-purple-600/50' 
+                    : role === 'admin' 
+                      ? 'bg-red-900/40 text-red-300 border border-red-600/50' 
+                      : 'bg-blue-900/40 text-blue-300 border border-blue-600/50'
+                }`}>
+                  {role || 'staff'}
+                </span>
+              )}
             </div>
 
             {/* Classificação do Staff */}

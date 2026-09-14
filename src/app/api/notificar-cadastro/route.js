@@ -56,6 +56,7 @@ export async function POST(request) {
             <p><strong>Chave Pix:</strong> ${dados.chavePix}</p>
             <p><strong>Curso:</strong> ${cursoFormatado}</p>
             <p><strong>Uniforme:</strong> ${uniformeFormatado}</p>
+            <p><strong>Uso de Imagem em Eventos:</strong> ${dados.autorizoImagem ? "✅ Autorizado" : "❌ Não autorizado"}</p>
             
             <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
             <p style="font-size: 12px; color: #888;">Acesse o painel do Supabase para gestão completa.</p>

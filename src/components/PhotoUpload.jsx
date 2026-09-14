@@ -34,7 +34,7 @@ export default function PhotoUpload({
     const options = {
       maxSizeMB: 0.5,
       maxWidthOrHeight: 1024,
-      useWebWorker: true,
+      useWebWorker: false,
     };
 
     try {

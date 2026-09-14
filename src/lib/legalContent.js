@@ -123,3 +123,45 @@ export const POLITICA_DE_PRIVACIDADE = {
   ],
 };
 
+export const TERMO_USO_IMAGEM = {
+  title: "Termo de Autorização de Uso de Imagem e Voz em Eventos",
+  subtitle: "Autorização para veiculação institucional e mídias sociais",
+  lastUpdated: "14 de Setembro de 2026",
+  sections: [
+    {
+      title: "1. Objeto e Escopo da Autorização",
+      content: [
+        "Pelo presente termo, o prestador de serviços ou colaborador autoriza, de forma livre e espontânea, a captação, fixação e utilização de sua imagem, voz e dados biográficos visuais, obtidos durante a execução de suas atividades e presença em eventos operacionais atendidos pela WADJET SEGURANÇA LTDA (CNPJ: 54.011.901/0001-08) e pela plataforma StaffVance.",
+      ],
+    },
+    {
+      title: "2. Finalidade e Mídias Sociais",
+      content: [
+        "A presente autorização destina-se exclusivamente à divulgação institucional, profissional e promocional dos serviços prestados, podendo ser veiculada em:",
+        "• Redes e mídias sociais oficiais (Instagram, Facebook, LinkedIn, TikTok, YouTube, entre outras);",
+        "• Websites, portais institucionais e aplicativos da empresa e da plataforma StaffVance;",
+        "• Crachás operacionais, murais de credenciamento e materiais informativos de controle de acesso;",
+        "• Relatórios operacionais e apresentações institucionais direcionadas a clientes contratantes de eventos.",
+      ],
+    },
+    {
+      title: "3. Preservação da Dignidade e Integridade Moral",
+      content: [
+        "Fica expressamente vedada a utilização da imagem e voz do prestador de serviço de maneira vexatória, descontextualizada, pejorativa ou que atente contra a sua honra, boa fama, moralidade e dignidade pessoal ou profissional, sendo respeitados os preceitos do Código Civil Brasileiro (Lei nº 10.406/2002, art. 20).",
+      ],
+    },
+    {
+      title: "4. Gratuidade e Direitos Autorais",
+      content: [
+        "Esta autorização é concedida a título gratuito, sem incidência de qualquer remuneração, indenização, royalties ou ônus financeiro adicional para a Wadjet Segurança LTDA, Sunset Field Solutions ou clientes contratantes dos eventos, tanto no presente quanto no futuro.",
+      ],
+    },
+    {
+      title: "5. Prazo, Território e Conformidade com a LGPD",
+      content: [
+        "A presente autorização é firmada por prazo indeterminado e com abrangência em território nacional e internacional. O tratamento de registros visuais e audiovisuais atende aos princípios de segurança, boa-fé e legítimo interesse institucional em conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018).",
+      ],
+    },
+  ],
+};
+

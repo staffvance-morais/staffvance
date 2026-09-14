@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 import { supabase } from "@/lib/supabase";
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import imageCompression from "browser-image-compression";
 import {
   CalendarDays,
   ChevronRight,
@@ -126,12 +127,15 @@ export default function CadastrarEventoCoordenador() {
 
     setEnviandoFoto(true);
     try {
-      const extensao = file.name.split(".").pop();
+      const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1024, useWebWorker: false };
+      const compressedFile = await imageCompression(file, options);
+
+      const extensao = (compressedFile.name || file.name || "jpg").split(".").pop();
       const nomeArquivo = `locais/${Date.now()}.${extensao}`;
 
       const { error: uploadError } = await supabase.storage
         .from(STORAGE_BUCKET)
-        .upload(nomeArquivo, file, { upsert: true });
+        .upload(nomeArquivo, compressedFile, { upsert: true });
 
       if (uploadError) throw uploadError;
 
@@ -141,7 +145,7 @@ export default function CadastrarEventoCoordenador() {
 
       setFotoUrl(publicUrlData.publicUrl);
     } catch (error) {
-      console.error(error);
+      console.error("Erro ao comprimir e enviar imagem:", error);
       alert("Erro ao enviar imagem. Verifique se o bucket 'eventos-fotos' existe no Supabase.");
     } finally {
       setEnviandoFoto(false);
