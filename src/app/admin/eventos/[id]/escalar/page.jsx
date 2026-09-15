@@ -16,6 +16,7 @@ export default function SelecionarSetorEscala() {
   
   // Lista padrão de fábrica
   const [setores, setSetores] = useState([
+    "Produção", "Coordenação",
     "Entrada (Revista)", "Banheiro", "Estacionamento", "Quadra (Campo)",
     "Vestiário", "Tribuna", "Camarote", "Acessos as arquibancadas",
     "Entrada para PCD", "Portão de emergência"

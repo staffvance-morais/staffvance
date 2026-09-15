@@ -389,6 +389,18 @@ export default function AcertoFinanceiro() {
     setTimeout(() => setZapCopiado(false), 3000);
   };
 
+  // Rolar suavemente até a seção de Gestão Fiscal & Impostos com destaque visual
+  const scrollParaGestaoFiscal = () => {
+    const el = document.getElementById("gestao-fiscal");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      el.classList.add("ring-2", "ring-emerald-500", "border-emerald-500");
+      setTimeout(() => {
+        el.classList.remove("ring-2", "ring-emerald-500", "border-emerald-500");
+      }, 1800);
+    }
+  };
+
   // 8. MANIPULAÇÃO DA EQUIPE E PAGAMENTOS
   const handleUpdateStaff = (id, campo, valor) => {
     setEquipe((prev) => prev.map((m) => (m.id === id ? { ...m, [campo]: valor } : m)));
@@ -753,18 +765,29 @@ export default function AcertoFinanceiro() {
             {/* GRID DE INDICADORES DO BALANÇO */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pt-2">
               
-              {/* Imposto / Tributo */}
-              <div className="bg-[#181818] p-3 rounded-md border border-[#2e2e2e] print:border-gray-300 print:bg-gray-50">
-                <div className="flex items-center justify-between text-[#888] text-[11px] font-bold uppercase tracking-wider mb-1">
-                  <span>Imposto / NF</span>
-                  <Landmark size={14} className="text-emerald-400" />
+              {/* Imposto / Tributo (Clicável para ir direto à Gestão Fiscal) */}
+              <div
+                onClick={scrollParaGestaoFiscal}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") scrollParaGestaoFiscal(); }}
+                title="Clique para ir direto à Gestão Fiscal e cálculo de impostos"
+                className="bg-[#181818] hover:bg-[#202020] p-3 rounded-md border border-[#2e2e2e] hover:border-emerald-500/70 transition-all cursor-pointer group shadow-sm print:border-gray-300 print:bg-gray-50 select-none"
+              >
+                <div className="flex items-center justify-between text-[#888] group-hover:text-emerald-400 text-[11px] font-bold uppercase tracking-wider mb-1 transition-colors">
+                  <span className="flex items-center gap-1">
+                    Imposto / NF
+                    <span className="text-[10px] text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity">↓</span>
+                  </span>
+                  <Landmark size={14} className="text-emerald-400 group-hover:scale-110 transition-transform" />
                 </div>
                 <p className="text-emerald-400 text-[15px] md:text-[17px] font-bold truncate print:text-emerald-700">
                   {formatarMoeda(valorImpostoCalculado)}
                 </p>
-                <span className="text-[10px] text-[#666] font-medium">
-                  {tributos.emitiuNf ? `${tributos.aliquota}% s/ receita` : "Isento / Sem NF"}
-                </span>
+                <div className="flex items-center justify-between text-[10px] text-[#666] group-hover:text-[#aaa] font-medium transition-colors mt-0.5">
+                  <span className="truncate">{tributos.emitiuNf ? `${tributos.aliquota}% s/ receita` : "Isento / Sem NF"}</span>
+                  <span className="text-emerald-400 text-[9px] font-semibold underline underline-offset-2 ml-1 shrink-0">Editar</span>
+                </div>
               </div>
 
               {/* Custo Equipe */}
@@ -897,7 +920,10 @@ export default function AcertoFinanceiro() {
           {/* ==========================================
               BLOCO 2: GESTÃO FISCAL & IMPOSTOS (NF-E)
              ========================================== */}
-          <section className="bg-[#222222] border border-[#333333] rounded-lg p-4 md:p-6 shadow-lg print:border-gray-300 print:bg-white print:p-4">
+          <section
+            id="gestao-fiscal"
+            className="scroll-mt-24 bg-[#222222] border border-[#333333] rounded-lg p-4 md:p-6 shadow-lg transition-all duration-500 print:border-gray-300 print:bg-white print:p-4"
+          >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#333] print:border-gray-300 mb-4 gap-2">
               <div className="flex items-center gap-2.5 text-[#f0f0f0] print:text-black">
                 <Calculator className="text-emerald-400" size={20} />

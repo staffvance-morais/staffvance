@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 // Roles que têm permissão para atualizar usuários
-const ROLES_PERMITIDOS = ["admin", "owner", "coordenador"];
+const ROLES_PERMITIDOS = ["admin", "owner", "coordenador", "producao", "produção"];
 
 export async function PUT(request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -86,10 +86,35 @@ export async function PUT(request) {
       return NextResponse.json({ error: "userId é obrigatório." }, { status: 400 });
     }
 
+    // Normaliza role e cargo se fornecidos
+    let roleNormalizada = role;
+    let cargoNormalizado = cargo;
+
+    if (role !== undefined) {
+      const rLower = String(role).toLowerCase().trim();
+      if (rLower === "producao" || rLower === "produção") {
+        roleNormalizada = "producao";
+        if (cargo === undefined) cargoNormalizado = "Produção";
+      } else if (rLower === "coordenador") {
+        roleNormalizada = "coordenador";
+        if (cargo === undefined) cargoNormalizado = "Coordenador";
+      } else if (rLower === "staff") {
+        roleNormalizada = "staff";
+        if (cargo === undefined) cargoNormalizado = "Staff";
+      }
+    } else if (cargo !== undefined) {
+      const cLower = String(cargo).toLowerCase().trim();
+      if (cLower.includes("prod")) {
+        roleNormalizada = "producao";
+      } else if (cLower.includes("coord")) {
+        roleNormalizada = "coordenador";
+      }
+    }
+
     // Monta o objeto com apenas os campos fornecidos
     const updateData = {};
-    if (role !== undefined) updateData.role = role;
-    if (cargo !== undefined) updateData.cargo = cargo;
+    if (roleNormalizada !== undefined) updateData.role = roleNormalizada;
+    if (cargoNormalizado !== undefined) updateData.cargo = cargoNormalizado;
     if (classificacao !== undefined) updateData.classificacao = classificacao;
     if (anotacoes !== undefined) updateData.anotacoes = anotacoes;
 
@@ -108,11 +133,11 @@ export async function PUT(request) {
     }
 
     // ─── 4. Opcional: Atualizar user_metadata no Auth se role/cargo foram alterados
-    if ((role !== undefined || cargo !== undefined) && supabaseServiceKey) {
+    if ((updateData.role !== undefined || updateData.cargo !== undefined) && supabaseServiceKey) {
       try {
         const metadataUpdate = {};
-        if (role !== undefined) metadataUpdate.role = role;
-        if (cargo !== undefined) metadataUpdate.cargo = cargo;
+        if (updateData.role !== undefined) metadataUpdate.role = updateData.role;
+        if (updateData.cargo !== undefined) metadataUpdate.cargo = updateData.cargo;
         await supabaseAdmin.auth.admin.updateUserById(userId, {
           user_metadata: metadataUpdate,
         });

@@ -31,6 +31,14 @@ const nextConfig = {
       },
     ];
   },
+  async rewrites() {
+    return [
+      {
+        source: '/producao/:path*',
+        destination: '/coordenador/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;

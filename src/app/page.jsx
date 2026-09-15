@@ -20,6 +20,8 @@ const ROLE_REDIRECTS = {
   admin: "/admin",
   owner: "/admin",
   coordenador: "/coordenador",
+  producao: "/producao",
+  produção: "/producao",
 };
 
 export default function Login() {

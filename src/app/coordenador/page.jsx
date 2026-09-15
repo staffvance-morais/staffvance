@@ -50,7 +50,7 @@ export default function PainelCoordenador() {
         const userRole = (perfilData?.role || "").toLowerCase().trim();
         if (
           !perfilData ||
-          (userRole !== "coordenador" && userRole !== "admin" && userRole !== "owner")
+          (userRole !== "coordenador" && userRole !== "producao" && userRole !== "produção" && userRole !== "admin" && userRole !== "owner")
         ) {
           router.push("/freelancers");
           return;
@@ -105,7 +105,9 @@ export default function PainelCoordenador() {
     );
   }
 
-  const primeiroNome = perfil?.nome_completo?.split(" ")[0] || "Coordenador";
+  const isProd = (perfil?.role || "").toLowerCase().includes("prod");
+  const basePath = isProd ? "/producao" : "/coordenador";
+  const primeiroNome = perfil?.nome_completo?.split(" ")[0] || (isProd ? "Produção" : "Coordenador");
 
   return (
     <div className="min-h-screen bg-[#141414] text-neutral-300 font-sans flex flex-col justify-between p-4 pb-6">
@@ -119,19 +121,19 @@ export default function PainelCoordenador() {
               Olá, {primeiroNome} 👋
             </h2>
             <p className="text-[12px] text-neutral-400">
-              Comando tático e operações de campo
+              {isProd ? "Gestão de produção e operações de campo" : "Comando tático e operações de campo"}
             </p>
           </div>
           <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-400">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-            Campo
+            {isProd ? "Produção" : "Campo"}
           </span>
         </div>
 
         {/* MÉTRICAS EM LINHA */}
         <div className="grid grid-cols-3 gap-2">
           <Link
-            href="/coordenador/eventos"
+            href={`${basePath}/eventos`}
             className="bg-[#1f1f1f] hover:bg-[#262626] border border-[#333] p-2.5 rounded text-center transition-all cursor-pointer"
           >
             <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider flex items-center justify-center gap-1">
@@ -144,7 +146,7 @@ export default function PainelCoordenador() {
           </Link>
 
           <Link
-            href="/coordenador/equipe"
+            href={`${basePath}/equipe`}
             className="bg-[#1f1f1f] hover:bg-[#262626] border border-[#333] p-2.5 rounded text-center transition-all cursor-pointer"
           >
             <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider flex items-center justify-center gap-1">
@@ -212,7 +214,7 @@ export default function PainelCoordenador() {
 
               {/* BOTÃO PRINCIPAL: CHAMADA / PRESENÇA */}
               <button
-                onClick={() => router.push(`/coordenador/eventos/${proximaOperacao.id}/presenca`)}
+                onClick={() => router.push(`${basePath}/eventos/${proximaOperacao.id}/presenca`)}
                 className="w-full bg-[#16a34a] hover:bg-[#15803d] text-white py-2.5 px-3 rounded text-[13px] font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md"
               >
                 <Users size={16} />
@@ -221,7 +223,7 @@ export default function PainelCoordenador() {
 
               <div className="grid grid-cols-2 gap-2 pt-0.5">
                 <button
-                  onClick={() => router.push(`/coordenador/eventos/${proximaOperacao.id}/escalar`)}
+                  onClick={() => router.push(`${basePath}/eventos/${proximaOperacao.id}/escalar`)}
                   className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white py-2.5 px-3 rounded text-[12px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <Users size={13} />
@@ -244,7 +246,7 @@ export default function PainelCoordenador() {
         </div>
 
         {/* MENU INFERIOR */}
-        <AppNavigation userProfile={perfil} userRole="coordenador" />
+        <AppNavigation userProfile={perfil} userRole={perfil?.role || "coordenador"} />
       </div>
     </div>
   );

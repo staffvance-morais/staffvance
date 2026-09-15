@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -91,9 +91,10 @@ export default function PainelClientesCoordenador() {
         .eq("id", user.id)
         .single();
 
+      const roleNorm = (perfilData?.role || "").toLowerCase().trim();
       if (
         !perfilData ||
-        (perfilData.role !== "coordenador" && perfilData.role !== "admin")
+        (roleNorm !== "coordenador" && roleNorm !== "producao" && roleNorm !== "produção" && roleNorm !== "admin" && roleNorm !== "owner")
       ) {
         router.push("/freelancers");
       } else {
@@ -233,7 +234,7 @@ export default function PainelClientesCoordenador() {
             </div>
           </button>
 
-          <AppNavigation userProfile={perfil} userRole="coordenador" />
+          <AppNavigation userProfile={perfil} userRole={perfil?.role || "coordenador"} />
         </div>
       </div>
     </div>

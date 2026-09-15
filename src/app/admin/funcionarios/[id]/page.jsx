@@ -70,12 +70,19 @@ export default function PerfilDetalhado() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Sessão expirada. Faça login novamente.");
 
+      const calculatedCargo =
+        role === "producao" || role === "produção"
+          ? "Produção"
+          : role === "coordenador"
+          ? "Coordenador"
+          : "Staff";
+
       const payload = { 
         userId: perfilId,
         classificacao, 
         anotacoes,
         role,
-        cargo: role
+        cargo: calculatedCargo
       };
 
       const res = await fetch("/api/atualizar-usuario", {
@@ -95,7 +102,7 @@ export default function PerfilDetalhado() {
         classificacao, 
         anotacoes,
         role,
-        cargo: role
+        cargo: calculatedCargo
       }));
       setEditMode(false);
     } catch (error) { 
@@ -138,7 +145,7 @@ export default function PerfilDetalhado() {
             {perfil?.foto_url ? <img src={perfil.foto_url} className="w-full h-full object-cover" /> : <User size={40} className="text-[#777]"/>}
           </div>
           <h2 className="text-[22px] font-bold text-white capitalize">{perfil?.nome_completo}</h2>
-          <p className="text-[#2563eb] uppercase tracking-widest text-[12px] font-bold mt-1">{perfil?.role || 'staff'}</p>
+          <p className="text-[#2563eb] uppercase tracking-widest text-[12px] font-bold mt-1">{perfil?.cargo || (perfil?.role === 'producao' ? 'Produção' : perfil?.role) || 'staff'}</p>
         </div>
 
         <div className="p-6">
@@ -214,10 +221,11 @@ export default function PerfilDetalhado() {
                 <ShieldCheck size={16} className="text-[#2563eb]"/> Cargo / Função no Sistema:
               </p>
               {editMode ? (
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                   {[
                     { key: 'staff', label: 'Staff' },
-                    { key: 'coordenador', label: 'Coordenador' }
+                    { key: 'coordenador', label: 'Coordenador' },
+                    { key: 'producao', label: 'Produção' }
                   ].map(r => (
                     <button 
                       key={r.key} 
@@ -237,11 +245,13 @@ export default function PerfilDetalhado() {
                 <span className={`inline-block px-4 py-1.5 rounded-sm font-bold text-[13px] uppercase tracking-wider ${
                   role === 'coordenador' 
                     ? 'bg-purple-900/40 text-purple-300 border border-purple-600/50' 
-                    : role === 'admin' 
-                      ? 'bg-red-900/40 text-red-300 border border-red-600/50' 
-                      : 'bg-blue-900/40 text-blue-300 border border-blue-600/50'
+                    : (role === 'producao' || role === 'produção')
+                      ? 'bg-amber-900/40 text-amber-300 border border-amber-600/50'
+                      : role === 'admin' || role === 'owner'
+                        ? 'bg-red-900/40 text-red-300 border border-red-600/50' 
+                        : 'bg-blue-900/40 text-blue-300 border border-blue-600/50'
                 }`}>
-                  {role || 'staff'}
+                  {role === 'producao' || role === 'produção' ? 'produção' : (role || 'staff')}
                 </span>
               )}
             </div>

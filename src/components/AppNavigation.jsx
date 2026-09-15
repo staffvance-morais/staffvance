@@ -35,6 +35,12 @@ const ROLE_MENUS = {
     { label: "Clientes", href: "/coordenador/clientes", icon: Handshake },
     { label: "Eventos", href: "/coordenador/eventos", icon: Calendar },
   ],
+  producao: [
+    { label: "Página inicial", href: "/producao", icon: Home },
+    { label: "Equipe", href: "/producao/equipe", icon: Contact },
+    { label: "Clientes", href: "/producao/clientes", icon: Handshake },
+    { label: "Eventos", href: "/producao/eventos", icon: Calendar },
+  ],
   staff: [
     { label: "Página inicial", href: "/freelancers", icon: Home },
     { label: "Eventos", href: "/freelancers/eventos", icon: Calendar },
@@ -48,6 +54,8 @@ const ROLE_MENUS = {
 const ROLE_LABELS = {
   admin: "Perfil de Administração",
   coordenador: "Perfil de Coordenação",
+  producao: "Perfil de Produção",
+  produção: "Perfil de Produção",
   staff: "Perfil de Staff",
   freelancer: "Perfil de Staff",
 };
@@ -123,6 +131,8 @@ export default function AppNavigation({
       ? "admin"
       : role?.includes("coord")
       ? "coordenador"
+      : (role?.includes("prod") || role === "produção")
+      ? "producao"
       : "staff";
 
   const menuItems = ROLE_MENUS[effectiveRole] || ROLE_MENUS.staff;

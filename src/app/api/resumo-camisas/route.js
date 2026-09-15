@@ -48,7 +48,7 @@ export async function POST(request) {
       return NextResponse.json({ error: "Erro ao buscar gestores." }, { status: 500 });
     }
 
-    const rolesPermitidas = ["admin", "coordenador", "owner"];
+    const rolesPermitidas = ["admin", "coordenador", "producao", "produção", "owner"];
     const gestores = (todosPerfis || []).filter(g => {
       const r = (g.role || "").toLowerCase().trim();
       return rolesPermitidas.includes(r);

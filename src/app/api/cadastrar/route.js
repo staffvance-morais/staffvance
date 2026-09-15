@@ -33,9 +33,16 @@ export async function POST(request) {
       chave_pix,
       curso,
       uniforme,
+      tamanho_camisa,
+      emblema,
+      classificacao,
+      observacoes,
+      anotacoes,
       foto_url,
       foto_base64,
       autorizo_imagem,
+      role: bodyRole,
+      cargo: bodyCargo,
     } = body;
 
     const emailLimpo = (email || "").trim().toLowerCase();
@@ -70,6 +77,34 @@ export async function POST(request) {
     let foiCriadoAgora = false;
     let sessionToken = null;
 
+    // Normalização de papel (role) e cargo
+    let finalRole = "staff";
+    let finalCargo = (bodyCargo || "").trim();
+
+    const rawRole = (bodyRole || "").toLowerCase().trim();
+    const rawCargo = finalCargo.toLowerCase();
+
+    if (rawRole === "producao" || rawRole === "produção" || rawCargo.includes("prod")) {
+      finalRole = "producao";
+      if (!finalCargo) finalCargo = "Produção";
+    } else if (rawRole === "coordenador" || rawCargo.includes("coord")) {
+      finalRole = "coordenador";
+      if (!finalCargo) finalCargo = "Coordenador";
+    } else if (rawRole === "admin" || rawCargo.includes("admin")) {
+      finalRole = "admin";
+      if (!finalCargo) finalCargo = "Administrador";
+    } else if (rawRole === "owner") {
+      finalRole = "owner";
+      if (!finalCargo) finalCargo = "Owner";
+    } else {
+      finalRole = "staff";
+      if (!finalCargo) finalCargo = "Staff";
+    }
+
+    const finalUniforme = (uniforme || tamanho_camisa || "").trim() || null;
+    const finalClassificacao = (classificacao || emblema || "").trim() || "Bronze";
+    const finalAnotacoes = (anotacoes || observacoes || "").trim() || null;
+
     if (isServiceRole) {
       // ─── FLUXO ADMINISTRATIVO (Service Role Key disponível) ───────
 
@@ -96,7 +131,8 @@ export async function POST(request) {
           user_metadata: {
             nome_completo: nomeLimpo,
             cpf: cpfLimpo,
-            role: "staff",
+            role: finalRole,
+            cargo: finalCargo,
             autorizo_imagem: typeof autorizo_imagem === "boolean" ? autorizo_imagem : true,
           },
         });
@@ -132,7 +168,8 @@ export async function POST(request) {
               user_metadata: {
                 nome_completo: nomeLimpo,
                 cpf: cpfLimpo,
-                role: "staff",
+                role: finalRole,
+                cargo: finalCargo,
                 autorizo_imagem: typeof autorizo_imagem === "boolean" ? autorizo_imagem : true,
               },
             });
@@ -162,7 +199,8 @@ export async function POST(request) {
           data: {
             nome_completo: nomeLimpo,
             cpf: cpfLimpo,
-            role: "staff",
+            role: finalRole,
+            cargo: finalCargo,
             autorizo_imagem: typeof autorizo_imagem === "boolean" ? autorizo_imagem : true,
           },
         },
@@ -239,10 +277,12 @@ export async function POST(request) {
       whatsapp: whatsapp ? whatsapp.trim() : null,
       chave_pix: chave_pix ? chave_pix.trim() : null,
       curso: curso || null,
-      uniforme: uniforme || null,
+      uniforme: finalUniforme,
+      classificacao: finalClassificacao,
+      anotacoes: finalAnotacoes,
       foto_url: finalFotoUrl,
-      role: "staff",
-      cargo: "staff",
+      role: finalRole,
+      cargo: finalCargo,
     });
 
     if (dbError) {

@@ -46,7 +46,7 @@ export default function EquipeCoordenador() {
   // Lógica da barra de pesquisa
   const filtrados = staffList.filter((membro) => {
     const nome = membro.nome_completo ? membro.nome_completo.toLowerCase() : "";
-    const cargo = membro.role ? membro.role.toLowerCase() : "";
+    const cargo = (membro.cargo || (membro.role === 'producao' ? 'Produção' : membro.role) || "").toLowerCase();
     const termo = busca.toLowerCase();
     return nome.includes(termo) || cargo.includes(termo);
   });
@@ -220,7 +220,7 @@ export default function EquipeCoordenador() {
                       {membro.nome_completo || "Nome não definido"}
                     </h3>
                     <p className="text-gray-400 text-sm mt-1 capitalize">
-                      {membro.role || "Cargo não definido"}
+                      {membro.cargo || (membro.role === 'producao' ? 'Produção' : membro.role) || "Cargo não definido"}
                     </p>
                   </div>
 

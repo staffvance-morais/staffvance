@@ -1,13 +1,64 @@
-﻿"use client";
+"use client";
 import { supabase } from "@/lib/supabase";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { 
   ArrowLeft, Save, Loader2, Type, Briefcase, MapPin, 
-  Calendar, Image as ImageIcon, Search, Check, Shield, Users
+  Calendar, Image as ImageIcon, Search, Check, Shield, Users,
+  ChevronDown, ChevronUp, ImagePlus
 } from "lucide-react";
 
-// Conexão com o Supabase
+const STORAGE_BUCKET = "eventos-fotos";
+
+// ==========================================
+// FUNÇÃO DE COMPRESSÃO DE IMAGEM
+// ==========================================
+const compactarImagem = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            const compressedFile = new File([blob], file.name, {
+              type: "image/jpeg",
+              lastModified: Date.now(),
+            });
+            resolve(compressedFile);
+          },
+          "image/jpeg",
+          0.7
+        );
+      };
+    };
+    reader.onerror = (error) => reject(error);
+  });
+};
 
 // Função auxiliar para data
 const formatarDataParaInput = (dataString) => {
@@ -45,7 +96,7 @@ const StaffCard = ({ membro, onToggle, onSetorChange }) => (
       <div className="mt-4 pt-3 border-t border-[#3b82f6]/30 animate-in fade-in slide-in-from-top-2">
         <input 
           type="text" 
-          placeholder="Setor de atuação (Ex: Portão A, Gramado)" 
+          placeholder="Setor de atuação (Ex: Produção, Coordenação, Portão A)" 
           value={membro.setor}
           onChange={(e) => onSetorChange(membro.id, e.target.value)}
           onClick={(e) => e.stopPropagation()}
@@ -62,6 +113,7 @@ const StaffCard = ({ membro, onToggle, onSetorChange }) => (
 export default function EditarEvento() {
   const router = useRouter();
   const eventoId = useParams().id;
+  const fileInputRef = useRef(null);
 
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
@@ -72,7 +124,24 @@ export default function EditarEvento() {
   const [endereco, setEndereco] = useState("");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
+
+  // Estados da Capa do Evento
   const [fotoUrl, setFotoUrl] = useState("");
+  const [fotoPreview, setFotoPreview] = useState("");
+  const [fotoUpload, setFotoUpload] = useState(null);
+  const [comprimindo, setComprimindo] = useState(false);
+
+  // Estados da Localização
+  const locaisDeFabrica = [
+    { nome: "Estádio Presidente Vargas", tatico: true },
+    { nome: "Estádio Carlos de Alencar Pinto", tatico: false },
+    { nome: "Ginásio Aécio de Borba", tatico: false },
+    { nome: "Cidade Vozão", tatico: false }
+  ];
+  const [locais, setLocais] = useState(locaisDeFabrica);
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const [carregandoLocais, setCarregandoLocais] = useState(false);
+  const [customLocalName, setCustomLocalName] = useState("");
 
   // Estados da Escala
   const [equipe, setEquipe] = useState([]);
@@ -82,14 +151,27 @@ export default function EditarEvento() {
     const fetchDadosCompletos = async () => {
       try {
         // 1. Puxa os dados em texto do evento
-        const { data: eventoData, error: eventoError } = await supabase.from('eventos').select('*').eq('id', eventoId).single();
+        const { data: eventoData, error: eventoError } = await supabase
+          .from('eventos')
+          .select('*')
+          .eq('id', eventoId)
+          .single();
+
         if (eventoError) throw eventoError;
 
         if (eventoData) {
           setTitulo(eventoData.titulo || "");
           setNomeContratante(eventoData.nome_contratante || "");
-          setEndereco(eventoData.endereco_texto || "");
+          const endSalvo = eventoData.endereco_texto || "";
+          setEndereco(endSalvo);
+          
+          const ehDeFabrica = locaisDeFabrica.some(l => l.nome.toLowerCase() === endSalvo.toLowerCase());
+          if (endSalvo && !ehDeFabrica) {
+            setCustomLocalName(endSalvo);
+          }
+
           setFotoUrl(eventoData.foto_local || "");
+          setFotoPreview(eventoData.foto_local || "");
           setDataInicio(formatarDataParaInput(eventoData.data_inicio));
           setDataFim(formatarDataParaInput(eventoData.data_fim));
         }
@@ -107,9 +189,9 @@ export default function EditarEvento() {
               funcao: p.role === 'staff' ? 'Staff Tático' : p.role,
               foto: p.foto_url || null,
               classificacao: p.classificacao || "",
-              escalado: !!escalaExistente, // true se achou no banco
+              escalado: !!escalaExistente,
               setor: escalaExistente ? escalaExistente.setor : "",
-              escalaId: escalaExistente ? escalaExistente.id : null // Guarda o ID da escala para atualizar depois
+              escalaId: escalaExistente ? escalaExistente.id : null
             };
           });
           setEquipe(equipeFormatada);
@@ -125,6 +207,65 @@ export default function EditarEvento() {
     if (eventoId) fetchDadosCompletos();
   }, [eventoId]);
 
+  // Busca locais salvos dinamicamente ao abrir o dropdown
+  useEffect(() => {
+    if (showLocationDropdown && locais.length === locaisDeFabrica.length) {
+      buscarLocaisSalvos();
+    }
+  }, [showLocationDropdown]);
+
+  const buscarLocaisSalvos = async () => {
+    setCarregandoLocais(true);
+    try {
+      const { data, error } = await supabase.from("eventos").select("endereco_texto");
+      if (data && !error) {
+        const todosNomes = data.map((e) => e.endereco_texto?.trim()).filter(Boolean);
+        const locaisMap = new Map();
+        todosNomes.forEach(nome => {
+          const key = nome.toLowerCase();
+          if (!locaisMap.has(key)) {
+            locaisMap.set(key, nome);
+          }
+        });
+        const nomesUnicos = Array.from(locaisMap.values());
+        const nomesNovos = nomesUnicos.filter((novoNome) => {
+          const novoNomeLower = novoNome.toLowerCase();
+          return !locaisDeFabrica.some((fabrica) => fabrica.nome.toLowerCase() === novoNomeLower);
+        });
+        const locaisExtras = nomesNovos.map((nome) => ({ nome: nome, tatico: false }));
+        setLocais([...locaisDeFabrica, ...locaisExtras]);
+      }
+    } catch (err) {
+      console.error("Erro ao buscar locais:", err);
+    } finally {
+      setCarregandoLocais(false);
+    }
+  };
+
+  // Manipulação da foto da capa
+  const selecionarFotoPublic = (caminho) => {
+    setFotoPreview(caminho);
+    setFotoUrl(caminho);
+    setFotoUpload(null);
+  };
+
+  const handleUploadFoto = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setComprimindo(true);
+    try {
+      const arquivoComprimido = await compactarImagem(file);
+      setFotoUpload(arquivoComprimido);
+      setFotoPreview(URL.createObjectURL(arquivoComprimido));
+    } catch (error) {
+      console.error("Erro na compactação:", error);
+      alert("Erro ao processar a imagem.");
+    } finally {
+      setComprimindo(false);
+    }
+  };
+
   // Controles da Escala
   const toggleStaff = (id) => setEquipe(prev => prev.map(m => m.id === id ? { ...m, escalado: !m.escalado } : m));
   const updateSetor = (id, novoSetor) => setEquipe(prev => prev.map(m => m.id === id ? { ...m, setor: novoSetor } : m));
@@ -135,14 +276,42 @@ export default function EditarEvento() {
     setSalvando(true);
 
     try {
+      let urlFinalDaFoto = fotoUrl;
+
+      // Se enviou nova foto pelo dispositivo, faz o upload para o Storage
+      if (fotoUpload) {
+        const extensao = fotoUpload.name.split(".").pop() || "jpg";
+        const nomeArquivo = `capas/${Date.now()}.${extensao}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .upload(nomeArquivo, fotoUpload, { upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from(STORAGE_BUCKET)
+          .getPublicUrl(nomeArquivo);
+
+        urlFinalDaFoto = publicUrlData.publicUrl;
+      }
+
+      const enderecoFinal = endereco === "Outro (Personalizar)" 
+        ? customLocalName 
+        : (endereco || customLocalName || null);
+      const possuiMapaTatico = Boolean(enderecoFinal && enderecoFinal.toLowerCase().includes("presidente vargas"));
+
       // 1. Salva as informações de texto
       const { error: updateError } = await supabase
         .from('eventos')
         .update({
-          titulo, nome_contratante: nomeContratante, endereco_texto: endereco,
+          titulo, 
+          nome_contratante: nomeContratante, 
+          endereco_texto: enderecoFinal,
+          mapa_tatico: possuiMapaTatico,
           data_inicio: dataInicio ? new Date(dataInicio).toISOString() : null,
           data_fim: dataFim ? new Date(dataFim).toISOString() : null,
-          foto_local: fotoUrl,
+          foto_local: urlFinalDaFoto || null,
         })
         .eq('id', eventoId);
       if (updateError) throw updateError;
@@ -212,7 +381,7 @@ export default function EditarEvento() {
             <h2 className="text-[#e5e5e5] text-[16px] font-bold uppercase tracking-wider mb-5 flex items-center gap-2 border-b border-[#333] pb-2">
               <Type size={18} className="text-[#2563eb]"/> Informações Gerais
             </h2>
-            <form className="space-y-5">
+            <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
               <div className="space-y-2">
                 <label className="text-[#999] text-[12px] font-semibold uppercase tracking-wider">Nome da Operação *</label>
                 <input type="text" value={titulo} onChange={(e) => setTitulo(e.target.value)} className="w-full bg-[#222] border border-[#3a3a3a] text-white p-3.5 rounded-sm focus:border-[#2563eb] outline-none" required />
@@ -221,10 +390,82 @@ export default function EditarEvento() {
                 <label className="text-[#999] text-[12px] font-semibold uppercase tracking-wider">Contratante</label>
                 <input type="text" value={nomeContratante} onChange={(e) => setNomeContratante(e.target.value)} className="w-full bg-[#222] border border-[#3a3a3a] text-white p-3.5 rounded-sm focus:border-[#2563eb] outline-none" />
               </div>
+
+              {/* LOCALIZAÇÃO COM DROPDOWN DE PRESETS E CUSTOM */}
               <div className="space-y-2">
-                <label className="text-[#999] text-[12px] font-semibold uppercase tracking-wider">Localização</label>
-                <input type="text" value={endereco} onChange={(e) => setEndereco(e.target.value)} className="w-full bg-[#222] border border-[#3a3a3a] text-white p-3.5 rounded-sm focus:border-[#2563eb] outline-none" />
+                <label className="text-[#999] text-[12px] font-semibold uppercase tracking-wider flex items-center gap-2">
+                  <MapPin size={15} className="text-[#2563eb]" /> Localização
+                </label>
+                <div className="bg-[#222] border border-[#3a3a3a] rounded-sm">
+                  <div
+                    onClick={() => setShowLocationDropdown(!showLocationDropdown)}
+                    className="flex items-center justify-between p-3.5 cursor-pointer bg-[#222] hover:bg-[#282828] transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <MapPin size={18} className="text-[#777]" />
+                      <span className={endereco ? "text-[#e5e5e5] text-[15px]" : "text-[#999] text-[15px]"}>
+                        {endereco || "Selecionar localização..."}
+                      </span>
+                    </div>
+                    {showLocationDropdown ? <ChevronUp size={18} className="text-[#777]" /> : <ChevronDown size={18} className="text-[#777]" />}
+                  </div>
+
+                  {showLocationDropdown && (
+                    <div className="bg-[#1a1a1a] border-t border-[#3a3a3a] flex flex-col shadow-inner">
+                      {carregandoLocais && (
+                        <div className="p-3.5 flex items-center gap-2 text-[#999] text-[13px]">
+                          <Loader2 className="animate-spin" size={14} /> Buscando locais...
+                        </div>
+                      )}
+
+                      {locais.map((loc, idx) => (
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            setEndereco(loc.nome);
+                            setShowLocationDropdown(false);
+                          }}
+                          className="p-3.5 border-b border-[#2e2e2e] hover:bg-[#2d2d2d] cursor-pointer flex flex-col transition-colors"
+                        >
+                          <span className="text-[#e5e5e5] text-[14px]">{loc.nome}</span>
+                          {loc.tatico && (
+                            <div className="flex items-center gap-1.5 mt-1 text-[10px] font-bold tracking-widest text-[#999]">
+                              <div className="w-2 h-2 bg-[#16a34a] rounded-sm"></div> POSSUI MAPA TÁTICO
+                            </div>
+                          )}
+                        </div>
+                      ))}
+
+                      <div
+                        onClick={() => {
+                          setEndereco("Outro (Personalizar)");
+                          if (!customLocalName && endereco && !locais.some(l => l.nome === endereco)) {
+                            setCustomLocalName(endereco);
+                          }
+                        }}
+                        className="p-3.5 border-b border-[#2e2e2e] text-[#e5e5e5] hover:bg-[#2d2d2d] cursor-pointer text-[14px]"
+                      >
+                        Outro (Personalizar)
+                      </div>
+
+                      {endereco === "Outro (Personalizar)" && (
+                        <div className="p-3.5 flex flex-col gap-2 bg-[#111111]">
+                          <input
+                            type="text"
+                            placeholder="Nome do local (Ex: Marina Park)"
+                            value={customLocalName}
+                            onChange={(e) => {
+                              setCustomLocalName(e.target.value);
+                            }}
+                            className="bg-[#2a2a2a] border border-[#444] text-[#e5e5e5] p-3 rounded-sm outline-none w-full placeholder:text-[#999] text-[14px] focus:border-[#2563eb]"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="space-y-2">
                   <label className="text-[#999] text-[12px] font-semibold uppercase tracking-wider">Início *</label>
@@ -235,9 +476,63 @@ export default function EditarEvento() {
                   <input type="datetime-local" value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="w-full bg-[#222] border border-[#3a3a3a] text-white p-3.5 rounded-sm focus:border-[#2563eb] outline-none [color-scheme:dark]" />
                 </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-[#999] text-[12px] font-semibold uppercase tracking-wider">Link da Imagem</label>
-                <input type="url" value={fotoUrl} onChange={(e) => setFotoUrl(e.target.value)} className="w-full bg-[#222] border border-[#3a3a3a] text-white p-3.5 rounded-sm focus:border-[#2563eb] outline-none" />
+
+              {/* CAPA DO EVENTO (PRESETS + UPLOAD DO DISPOSITIVO, SEM OPÇÃO DE LINK) */}
+              <div className="space-y-3 pt-2">
+                <label className="text-[#999] text-[12px] font-semibold uppercase tracking-wider flex items-center gap-2">
+                  <ImageIcon size={15} className="text-[#2563eb]" /> Capa do Evento
+                </label>
+
+                <div className="w-full h-[180px] bg-[#222] border border-[#3a3a3a] rounded-sm overflow-hidden flex items-center justify-center relative">
+                  {comprimindo ? (
+                    <div className="flex flex-col items-center text-[#777]">
+                      <Loader2 className="animate-spin mb-2" size={28} />
+                      <span className="text-[13px]">Compactando imagem...</span>
+                    </div>
+                  ) : fotoPreview ? (
+                    <img src={fotoPreview} alt="Capa do Evento" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="flex flex-col items-center text-[#666]">
+                      <ImageIcon size={36} className="mb-2 opacity-50" />
+                      <span className="text-[13px]">Nenhuma foto selecionada</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => selecionarFotoPublic("/Presidente_Vargas_Stadium.jpg")}
+                    className="bg-[#2a2a2a] border border-[#444] hover:bg-[#333] text-[#ccc] font-semibold text-[13px] py-2.5 rounded-sm transition-colors cursor-pointer"
+                  >
+                    Usar PV
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => selecionarFotoPublic("/aecio_de_borba.jpg")}
+                    className="bg-[#2a2a2a] border border-[#444] hover:bg-[#333] text-[#ccc] font-semibold text-[13px] py-2.5 rounded-sm transition-colors cursor-pointer"
+                  >
+                    Usar Aécio
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="col-span-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-[15px] font-bold py-3 rounded-sm transition-colors flex items-center justify-center gap-2 mt-1 cursor-pointer"
+                  >
+                    <ImagePlus size={20} />
+                    Enviar do dispositivo
+                  </button>
+
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={fileInputRef}
+                    onChange={handleUploadFoto}
+                    className="hidden"
+                  />
+                </div>
               </div>
             </form>
           </div>

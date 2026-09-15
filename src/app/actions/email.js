@@ -2,7 +2,7 @@
 import { transporter } from "@/lib/nodemailer";
 
 // URL base do seu sistema
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://gerenciador.wadjet.seg.br";
 
 // 1. TEMPLATE: AVISO DE ESCALAÇÃO
 export async function enviarEmailEscalacao(destinatario, nomeStaff, dadosEvento, setor) {

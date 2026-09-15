@@ -26,6 +26,10 @@ const ROUTE_CONFIG = {
     icon: Home,
     items: [{ label: "Página inicial" }],
   },
+  "/producao": {
+    icon: Home,
+    items: [{ label: "Página inicial" }],
+  },
   "/admin": {
     icon: Home,
     items: [{ label: "Página inicial" }],
@@ -46,6 +50,17 @@ const ROUTE_CONFIG = {
     icon: Contact,
     items: [
       { label: "Equipe", href: "/coordenador/equipe" },
+      { label: "Cadastrar funcionário" },
+    ],
+  },
+  "/producao/equipe": {
+    icon: Contact,
+    items: [{ label: "Equipe" }],
+  },
+  "/producao/equipe/novo": {
+    icon: Contact,
+    items: [
+      { label: "Equipe", href: "/producao/equipe" },
       { label: "Cadastrar funcionário" },
     ],
   },
@@ -72,6 +87,17 @@ const ROUTE_CONFIG = {
     icon: Calendar,
     items: [
       { label: "Eventos", href: "/coordenador/eventos" },
+      { label: "Cadastrar evento" },
+    ],
+  },
+  "/producao/eventos": {
+    icon: Calendar,
+    items: [{ label: "Eventos" }],
+  },
+  "/producao/eventos/cadastrar": {
+    icon: Calendar,
+    items: [
+      { label: "Eventos", href: "/producao/eventos" },
       { label: "Cadastrar evento" },
     ],
   },
@@ -108,6 +134,17 @@ const ROUTE_CONFIG = {
       { label: "Cadastrar cliente" },
     ],
   },
+  "/producao/clientes": {
+    icon: Users,
+    items: [{ label: "Clientes" }],
+  },
+  "/producao/clientes/cadastrar": {
+    icon: Users,
+    items: [
+      { label: "Clientes", href: "/producao/clientes" },
+      { label: "Cadastrar cliente" },
+    ],
+  },
   "/admin/financeiro": {
     icon: DollarSign,
     items: [{ label: "Financeiro" }],
@@ -138,8 +175,9 @@ function resolveRouteConfig(pathname) {
   }
 
   if (pathname.includes("/equipe/") || pathname.includes("/funcionarios/")) {
+    const isProducao = pathname.startsWith("/producao");
     const isCoordenador = pathname.startsWith("/coordenador");
-    const baseHref = isCoordenador ? "/coordenador/equipe" : "/admin/funcionarios";
+    const baseHref = isProducao ? "/producao/equipe" : isCoordenador ? "/coordenador/equipe" : "/admin/funcionarios";
     return {
       icon: Contact,
       items: [
@@ -150,8 +188,9 @@ function resolveRouteConfig(pathname) {
   }
 
   if (pathname.includes("/eventos/")) {
+    const isProducao = pathname.startsWith("/producao");
     const isCoordenador = pathname.startsWith("/coordenador");
-    const baseHref = isCoordenador ? "/coordenador/eventos" : "/admin/eventos";
+    const baseHref = isProducao ? "/producao/eventos" : isCoordenador ? "/coordenador/eventos" : "/admin/eventos";
     let subAction = "Detalhes do evento";
     if (pathname.endsWith("/escalar")) subAction = "Escalar equipe";
     else if (pathname.endsWith("/alocar")) subAction = "Alocar equipe";
@@ -168,8 +207,9 @@ function resolveRouteConfig(pathname) {
   }
 
   if (pathname.includes("/clientes/")) {
+    const isProducao = pathname.startsWith("/producao");
     const isCoordenador = pathname.startsWith("/coordenador");
-    const baseHref = isCoordenador ? "/coordenador/clientes" : "/admin/clientes";
+    const baseHref = isProducao ? "/producao/clientes" : isCoordenador ? "/coordenador/clientes" : "/admin/clientes";
     return {
       icon: Users,
       items: [

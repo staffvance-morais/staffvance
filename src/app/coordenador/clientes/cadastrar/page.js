@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import imageCompression from "browser-image-compression";
@@ -20,7 +20,8 @@ export default function CadastrarClienteCoordenador() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/"); return; }
       const { data: perfilData } = await supabase.from("perfis").select("role").eq("id", user.id).single();
-      if (!perfilData || (perfilData.role !== "coordenador" && perfilData.role !== "admin")) {
+      const roleNorm = (perfilData?.role || "").toLowerCase().trim();
+      if (!perfilData || (roleNorm !== "coordenador" && roleNorm !== "producao" && roleNorm !== "produção" && roleNorm !== "admin" && roleNorm !== "owner")) {
         router.push("/freelancers");
       } else {
         setIsAuthorized(true);

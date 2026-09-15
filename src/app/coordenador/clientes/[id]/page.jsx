@@ -48,7 +48,8 @@ export default function DetalhesClienteCoordenador() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) { router.push("/"); return; }
       const { data: perfilData } = await supabase.from("perfis").select("role").eq("id", session.user.id).single();
-      if (!perfilData || (perfilData.role !== "coordenador" && perfilData.role !== "admin")) {
+      const roleNorm = (perfilData?.role || "").toLowerCase().trim();
+      if (!perfilData || (roleNorm !== "coordenador" && roleNorm !== "producao" && roleNorm !== "produção" && roleNorm !== "admin" && roleNorm !== "owner")) {
         router.push("/freelancers");
       } else {
         setIsAuthorized(true);

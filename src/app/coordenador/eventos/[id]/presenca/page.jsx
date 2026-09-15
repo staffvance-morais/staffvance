@@ -62,7 +62,7 @@ export default function ListaPresencaCoordenador() {
           .single();
 
         const role = (perfilData?.role || "").toLowerCase().trim();
-        if (role !== "admin" && role !== "owner" && role !== "coordenador") {
+        if (role !== "admin" && role !== "owner" && role !== "coordenador" && role !== "producao" && role !== "produção") {
           router.push("/freelancers");
           return;
         }

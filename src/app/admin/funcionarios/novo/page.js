@@ -114,6 +114,10 @@ export default function CadastrarFuncionario() {
         });
       }
 
+      const roleCalculada =
+        cargo === "Produção" ? "producao" :
+        cargo === "Coordenador" ? "coordenador" : "staff";
+
       const response = await fetch('/api/cadastrar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -125,7 +129,8 @@ export default function CadastrarFuncionario() {
           data_nascimento: dataNascimento || null,
           whatsapp: telefone || null,
           chave_pix: pix || null,
-          cargo: cargo || null,
+          role: roleCalculada,
+          cargo: cargo || "Staff",
           emblema: nivel || "Bronze",
           tamanho_camisa: tamanho || null,
           observacoes: observacao || null,
@@ -337,7 +342,7 @@ export default function CadastrarFuncionario() {
                 </div>
                 {isCargoOpen && (
                   <div className="absolute top-full left-0 w-full bg-[#1a1a1a] border border-[#333] mt-1 shadow-lg">
-                    {["Segurança", "Staff"].map((opcao) => (
+                    {["Segurança", "Staff", "Produção", "Coordenador"].map((opcao) => (
                       <div 
                         key={opcao}
                         onClick={() => {setCargo(opcao); setIsCargoOpen(false);}}
