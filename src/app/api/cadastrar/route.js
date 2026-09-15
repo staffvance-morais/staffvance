@@ -5,16 +5,19 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!supabaseUrl || !supabaseServiceKey) {
+  if (!supabaseUrl || (!supabaseServiceKey && !supabaseAnonKey)) {
     return NextResponse.json(
-      { error: "Configuração do Supabase ausente no servidor (SUPABASE_SERVICE_ROLE_KEY)." },
+      { error: "Configuração do Supabase ausente no servidor." },
       { status: 500 }
     );
   }
 
-  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+  // Cliente admin usando Service Role Key se configurada; caso contrário, cliente Anon
+  const isServiceRole = Boolean(supabaseServiceKey);
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey || supabaseAnonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
@@ -46,21 +49,7 @@ export async function POST(request) {
       );
     }
 
-    // 1. Verifica se o CPF já está em uso por outro perfil
-    const { data: cpfExistente } = await supabaseAdmin
-      .from("perfis")
-      .select("id, email")
-      .eq("cpf", cpfLimpo)
-      .maybeSingle();
-
-    if (cpfExistente && cpfExistente.email?.toLowerCase() !== emailLimpo) {
-      return NextResponse.json(
-        { error: "Este CPF já está cadastrado em outra conta. Verifique os dados digitados." },
-        { status: 400 }
-      );
-    }
-
-    // 2. Converte e valida data de nascimento (DD/MM/AAAA -> AAAA-MM-DD)
+    // 1. Converte e valida data de nascimento (DD/MM/AAAA -> AAAA-MM-DD)
     let dataBanco = null;
     if (data_nascimento && data_nascimento.includes("/")) {
       const partes = data_nascimento.split("/");
@@ -77,82 +66,145 @@ export async function POST(request) {
       dataBanco = data_nascimento;
     }
 
-    // 3. Tenta criar o usuário no Supabase Auth com confirmação automática de e-mail
     let userId = null;
     let foiCriadoAgora = false;
+    let sessionToken = null;
 
-    const { data: authData, error: authError } =
-      await supabaseAdmin.auth.admin.createUser({
+    if (isServiceRole) {
+      // ─── FLUXO ADMINISTRATIVO (Service Role Key disponível) ───────
+
+      // 1. Verifica se o CPF já está em uso por outro perfil
+      const { data: cpfExistente } = await supabaseAdmin
+        .from("perfis")
+        .select("id, email")
+        .eq("cpf", cpfLimpo)
+        .maybeSingle();
+
+      if (cpfExistente && cpfExistente.email?.toLowerCase() !== emailLimpo) {
+        return NextResponse.json(
+          { error: "Este CPF já está cadastrado em outra conta. Verifique os dados digitados." },
+          { status: 400 }
+        );
+      }
+
+      // 2. Cria o usuário com e-mail confirmado automaticamente
+      const { data: authData, error: authError } =
+        await supabaseAdmin.auth.admin.createUser({
+          email: emailLimpo,
+          password,
+          email_confirm: true,
+          user_metadata: {
+            nome_completo: nomeLimpo,
+            cpf: cpfLimpo,
+            role: "staff",
+            autorizo_imagem: typeof autorizo_imagem === "boolean" ? autorizo_imagem : true,
+          },
+        });
+
+      if (authError) {
+        const msg = (authError.message || "").toLowerCase();
+
+        // AUTO-RECUPERAÇÃO: Se o e-mail já existe no Auth
+        if (msg.includes("already registered") || msg.includes("already in use")) {
+          const { data: perfilExistente } = await supabaseAdmin
+            .from("perfis")
+            .select("id")
+            .eq("email", emailLimpo)
+            .maybeSingle();
+
+          if (perfilExistente) {
+            return NextResponse.json(
+              { error: "Este e-mail já possui cadastro. Faça login ou utilize a recuperação de senha." },
+              { status: 400 }
+            );
+          }
+
+          // Se NÃO tem perfil (conta órfã presa no Auth), atualiza senha e recupera
+          const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+          const userOrfao = listData?.users?.find(
+            (u) => u.email?.toLowerCase() === emailLimpo
+          );
+
+          if (userOrfao) {
+            await supabaseAdmin.auth.admin.updateUserById(userOrfao.id, {
+              password,
+              email_confirm: true,
+              user_metadata: {
+                nome_completo: nomeLimpo,
+                cpf: cpfLimpo,
+                role: "staff",
+                autorizo_imagem: typeof autorizo_imagem === "boolean" ? autorizo_imagem : true,
+              },
+            });
+            userId = userOrfao.id;
+          } else {
+            return NextResponse.json(
+              { error: "Este e-mail já está cadastrado no sistema. Tente fazer login." },
+              { status: 400 }
+            );
+          }
+        } else {
+          return NextResponse.json(
+            { error: authError.message || "Erro ao criar usuário no sistema." },
+            { status: 400 }
+          );
+        }
+      } else {
+        userId = authData.user.id;
+        foiCriadoAgora = true;
+      }
+    } else {
+      // ─── FLUXO DE CONTINGÊNCIA (Fallback via Anon Key) ───────────
+      const { data: authData, error: authError } = await supabaseAdmin.auth.signUp({
         email: emailLimpo,
         password,
-        email_confirm: true,
-        user_metadata: {
-          nome_completo: nomeLimpo,
-          cpf: cpfLimpo,
-          role: "staff",
-          autorizo_imagem: typeof autorizo_imagem === "boolean" ? autorizo_imagem : true,
+        options: {
+          data: {
+            nome_completo: nomeLimpo,
+            cpf: cpfLimpo,
+            role: "staff",
+            autorizo_imagem: typeof autorizo_imagem === "boolean" ? autorizo_imagem : true,
+          },
         },
       });
 
-    if (authError) {
-      const msg = (authError.message || "").toLowerCase();
-
-      // AUTO-RECUPERAÇÃO: Se o e-mail já existe no Auth
-      if (msg.includes("already registered") || msg.includes("already in use")) {
-        // Verifica se existe perfil na tabela perfis
-        const { data: perfilExistente } = await supabaseAdmin
-          .from("perfis")
-          .select("id")
-          .eq("email", emailLimpo)
-          .maybeSingle();
-
-        if (perfilExistente) {
-          // O perfil já existe de verdade: pede para fazer login
+      if (authError) {
+        const msg = (authError.message || "").toLowerCase();
+        if (msg.includes("already registered") || msg.includes("already in use")) {
           return NextResponse.json(
             { error: "Este e-mail já possui cadastro. Faça login ou utilize a recuperação de senha." },
             { status: 400 }
           );
         }
-
-        // Se NÃO tem perfil (conta órfã/presa no Auth), recupera o usuário e cria o perfil!
-        const { data: listData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-        const userOrfao = listData?.users?.find(
-          (u) => u.email?.toLowerCase() === emailLimpo
-        );
-
-        if (userOrfao) {
-          // Atualiza a senha e os metadados do usuário existente
-          await supabaseAdmin.auth.admin.updateUserById(userOrfao.id, {
-            password,
-            email_confirm: true,
-            user_metadata: {
-              nome_completo: nomeLimpo,
-              cpf: cpfLimpo,
-              role: "staff",
-              autorizo_imagem: typeof autorizo_imagem === "boolean" ? autorizo_imagem : true,
-            },
-          });
-          userId = userOrfao.id;
-        } else {
-          return NextResponse.json(
-            { error: "Este e-mail já está cadastrado no sistema. Tente fazer login." },
-            { status: 400 }
-          );
-        }
-      } else {
         return NextResponse.json(
-          { error: authError.message || "Erro ao criar usuário no sistema." },
+          { error: authError.message || "Erro ao realizar cadastro." },
           { status: 400 }
         );
       }
-    } else {
+
+      if (!authData?.user?.id) {
+        return NextResponse.json(
+          { error: "Não foi possível criar o usuário. Tente novamente." },
+          { status: 400 }
+        );
+      }
+
       userId = authData.user.id;
+      sessionToken = authData.session?.access_token || null;
       foiCriadoAgora = true;
     }
 
+    // Cliente ativo para gravação (se temos token da sessão no fallback, usamos o cliente autenticado)
+    const activeClient = sessionToken
+      ? createClient(supabaseUrl, supabaseAnonKey, {
+          global: { headers: { Authorization: `Bearer ${sessionToken}` } },
+          auth: { autoRefreshToken: false, persistSession: false },
+        })
+      : supabaseAdmin;
+
     let finalFotoUrl = foto_url || null;
 
-    // 4. Upload de foto via servidor usando Service Role Key se foto_base64 foi enviada
+    // 4. Upload de foto se foto_base64 foi enviada
     if (foto_base64) {
       try {
         const base64Data = foto_base64.replace(/^data:image\/\w+;base64,/, "");
@@ -160,12 +212,12 @@ export async function POST(request) {
         const fileName = `${userId}-perfil.jpg`;
         const filePath = `fotos_perfil/${fileName}`;
 
-        const { error: uploadError } = await supabaseAdmin.storage
+        const { error: uploadError } = await activeClient.storage
           .from("perfis")
           .upload(filePath, buffer, { contentType: "image/jpeg", upsert: true });
 
         if (!uploadError) {
-          const { data: pubUrlData } = supabaseAdmin.storage
+          const { data: pubUrlData } = activeClient.storage
             .from("perfis")
             .getPublicUrl(filePath);
           finalFotoUrl = pubUrlData.publicUrl;
@@ -177,8 +229,8 @@ export async function POST(request) {
       }
     }
 
-    // 5. Insere/Atualiza o perfil na tabela perfis (bypassing RLS)
-    const { error: dbError } = await supabaseAdmin.from("perfis").upsert({
+    // 5. Insere/Atualiza o perfil na tabela perfis
+    const { error: dbError } = await activeClient.from("perfis").upsert({
       id: userId,
       email: emailLimpo,
       nome_completo: nomeLimpo,
@@ -193,10 +245,9 @@ export async function POST(request) {
       cargo: "staff",
     });
 
-    // Se falhar ao salvar no banco e foi criado agora, remove do Auth para não deixar conta órfã
     if (dbError) {
       console.error("❌ ERRO NA TABELA PERFIS:", dbError.message);
-      if (foiCriadoAgora) {
+      if (foiCriadoAgora && isServiceRole) {
         await supabaseAdmin.auth.admin.deleteUser(userId);
       }
       return NextResponse.json(
