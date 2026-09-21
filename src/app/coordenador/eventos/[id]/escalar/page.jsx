@@ -2,7 +2,7 @@
 import { supabase } from "@/lib/supabase";
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { CalendarDays, ChevronRight, User, Info, Menu, Loader2 } from "lucide-react";
+import { CalendarDays, ChevronRight, User, Info, Menu, Loader2, Shirt } from "lucide-react";
 
 export default function SelecionarSetorEscalaCoordenador() {
   const router = useRouter();
@@ -11,7 +11,8 @@ export default function SelecionarSetorEscalaCoordenador() {
 
   const [loading, setLoading] = useState(true);
   const [salvandoSetor, setSalvandoSetor] = useState(false);
-  const [enviandoRelatorio, setEnviandoRelatorio] = useState(false);
+  const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
+  const [relatorioEnviado, setRelatorioEnviado] = useState(false);
   const [escalas, setEscalas] = useState([]);
   
   const [setores, setSetores] = useState([
@@ -102,20 +103,31 @@ export default function SelecionarSetorEscalaCoordenador() {
 
   const totalEscaladosGeral = escalas.length;
 
-  const handleConcluir = async () => {
-    setEnviandoRelatorio(true);
+  const handleGerarRelatorioCamisas = async () => {
+    setGerandoRelatorio(true);
     try {
-      await fetch("/api/resumo-camisas", {
+      const res = await fetch("/api/resumo-camisas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ eventoId }),
       });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRelatorioEnviado(true);
+        alert("✅ Relatório de camisas gerado e enviado por e-mail com sucesso para os gestores!");
+      } else {
+        alert("Aviso: " + (data.message || data.error || "Não foi possível gerar o relatório de camisas."));
+      }
     } catch (err) {
-      console.error("Erro ao enviar relatorio de camisas:", err);
+      console.error("Erro ao gerar relatório de camisas:", err);
+      alert("Erro ao enviar relatório de camisas.");
     } finally {
-      setEnviandoRelatorio(false);
-      router.push(`/coordenador/eventos/${eventoId}`);
+      setGerandoRelatorio(false);
     }
+  };
+
+  const handleConcluir = () => {
+    router.push(`/coordenador/eventos/${eventoId}`);
   };
 
   return (
@@ -195,20 +207,33 @@ export default function SelecionarSetorEscalaCoordenador() {
               Adicionar novo setor
             </button>
 
+            {totalEscaladosGeral > 0 && (
+              <button
+                type="button"
+                onClick={handleGerarRelatorioCamisas}
+                disabled={gerandoRelatorio}
+                className="w-full bg-[#1e293b] hover:bg-[#27384f] border border-[#3b82f6]/40 text-[#60a5fa] font-bold py-3.5 rounded-sm transition-colors cursor-pointer text-[15px] flex items-center justify-center gap-2 shadow-sm"
+              >
+                {gerandoRelatorio ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    <span>Gerando relatório...</span>
+                  </>
+                ) : (
+                  <>
+                    <Shirt size={18} />
+                    <span>{relatorioEnviado ? "Reenviar relatório de camisas" : "Gerar relatório de camisas"}</span>
+                  </>
+                )}
+              </button>
+            )}
+
             {totalEscaladosGeral > 0 ? (
               <button 
                 onClick={handleConcluir}
-                disabled={enviandoRelatorio}
                 className="w-full bg-[#16a34a] hover:bg-[#15803d] text-white font-bold py-3.5 rounded-sm transition-colors cursor-pointer text-[16px] flex items-center justify-center gap-2"
               >
-                {enviandoRelatorio ? (
-                  <>
-                    <Loader2 className="animate-spin" size={20} />
-                    <span>Enviando relatório...</span>
-                  </>
-                ) : (
-                  "Concluir"
-                )}
+                Concluir
               </button>
             ) : (
               <button 

@@ -16,13 +16,15 @@ import {
   Menu,
   Loader2,
   Trash2,
-  AlertTriangle 
+  AlertTriangle,
+  Archive,
+  ArchiveRestore
 } from "lucide-react";
 
 // ==========================================
 // COMPONENTE: CARD DO EVENTO (DINÂMICO)
 // ==========================================
-const EventCard = ({ id, image, title, location, date, time, client, staffCount, isLive, isPassado, selected, router, onDeleteClick }) => {
+const EventCard = ({ id, image, title, location, date, time, client, staffCount, isLive, isPassado, isArquivado, selected, router, onDeleteClick, onArchiveClick, onUnarchiveClick }) => {
   return (
     <div className="border border-[#3a3a3a] bg-[#222222] flex flex-col mb-4 rounded-sm overflow-hidden shrink-0">
       {/* Imagem do Evento */}
@@ -33,11 +35,15 @@ const EventCard = ({ id, image, title, location, date, time, client, staffCount,
           <div className="flex items-center justify-center h-full text-[#666] text-xs">Sem Imagem</div>
         )}
 
-        {/* Badge discreta de evento passado ou ao vivo */}
+        {/* Badge discreta de evento passado, arquivado ou ao vivo */}
         {isLive ? (
           <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-black/80 border border-[#22c55e]/50 px-2 py-0.5 rounded-sm text-[#22c55e] text-[11px] font-bold tracking-widest uppercase">
             <div className="w-2 h-2 bg-[#22c55e] rounded-full animate-pulse"></div> 
             AO VIVO
+          </div>
+        ) : isArquivado ? (
+          <div className="absolute top-2 right-2 bg-black/80 border border-amber-500/50 px-2 py-0.5 rounded-sm text-amber-400 text-[11px] font-bold tracking-wider uppercase flex items-center gap-1">
+            <Archive size={11} /> Arquivado
           </div>
         ) : isPassado ? (
           <div className="absolute top-2 right-2 bg-black/80 border border-[#555] px-2 py-0.5 rounded-sm text-[#999] text-[11px] font-bold tracking-wider uppercase">
@@ -77,8 +83,36 @@ const EventCard = ({ id, image, title, location, date, time, client, staffCount,
             </div>
           </div>
 
-          {/* Botões de Ação: Excluir e Info */}
+          {/* Botões de Ação */}
           <div className="flex items-center gap-2">
+            {/* Botão de Arquivar (para eventos encerrados e não arquivados) */}
+            {isPassado && !isArquivado && (
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  onArchiveClick({ id, title });
+                }}
+                title="Arquivar Evento"
+                className="w-11 h-11 border border-amber-900/60 rounded-sm bg-amber-950/40 flex items-center justify-center text-amber-400 hover:bg-amber-950 hover:border-amber-600 hover:text-amber-200 transition-colors cursor-pointer"
+              >
+                <Archive size={19} strokeWidth={1.8} />
+              </button>
+            )}
+
+            {/* Botão de Desarquivar (para eventos já arquivados) */}
+            {isArquivado && (
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  onUnarchiveClick({ id, title });
+                }}
+                title="Desarquivar Evento"
+                className="w-11 h-11 border border-blue-900/60 rounded-sm bg-blue-950/40 flex items-center justify-center text-blue-400 hover:bg-blue-950 hover:border-blue-600 hover:text-blue-200 transition-colors cursor-pointer"
+              >
+                <ArchiveRestore size={19} strokeWidth={1.8} />
+              </button>
+            )}
+
             {/* Botão de Excluir */}
             <button 
               onClick={(e) => {
@@ -119,9 +153,11 @@ export default function PainelEventosMorais() {
   const [confirmDelete, setConfirmDelete] = useState(null); // { id, title }
   const [deletando, setDeletando] = useState(false);
 
-  useEffect(() => {
-    fetchEventos();
-  }, []);
+  // Estado para arquivamento e visualização
+  const [aba, setAba] = useState("ativos"); // "ativos" | "arquivados"
+  const [showMaisOpcoes, setShowMaisOpcoes] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(null); // { id, title }
+  const [arquivando, setArquivando] = useState(false);
 
   const fetchEventos = async () => {
     try {
@@ -153,6 +189,7 @@ export default function PainelEventosMorais() {
             isPassado = dataFinal < agora;
           }
 
+          const isArquivado = ev.escopo === 'arquivado';
           const count = escData ? escData.filter(esc => esc.evento_id === ev.id).length : 0;
 
           return {
@@ -166,6 +203,7 @@ export default function PainelEventosMorais() {
             staffCount: `${count} escalado(s)`, 
             isLive: false,
             isPassado,
+            isArquivado,
             selected: true
           };
         });
@@ -178,6 +216,10 @@ export default function PainelEventosMorais() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchEventos();
+  }, []);
 
   const handleConfirmarExclusao = async () => {
     if (!confirmDelete) return;
@@ -232,7 +274,50 @@ export default function PainelEventosMorais() {
     }
   };
 
-  const eventosFiltrados = eventos.filter(ev => 
+  const handleConfirmarArquivamento = async () => {
+    if (!confirmArchive) return;
+    setArquivando(true);
+
+    try {
+      const { error } = await supabase
+        .from('eventos')
+        .update({ escopo: 'arquivado' })
+        .eq('id', confirmArchive.id);
+
+      if (error) throw error;
+
+      setEventos(prev => prev.map(e => e.id === confirmArchive.id ? { ...e, isArquivado: true } : e));
+      setConfirmArchive(null);
+    } catch (err) {
+      console.error("Erro ao arquivar evento:", err);
+      alert("Erro ao arquivar evento: " + (err.message || "Tente novamente"));
+    } finally {
+      setArquivando(false);
+    }
+  };
+
+  const handleDesarquivar = async (evInfo) => {
+    try {
+      const { error } = await supabase
+        .from('eventos')
+        .update({ escopo: null })
+        .eq('id', evInfo.id);
+
+      if (error) throw error;
+
+      setEventos(prev => prev.map(e => e.id === evInfo.id ? { ...e, isArquivado: false } : e));
+    } catch (err) {
+      console.error("Erro ao desarquivar evento:", err);
+      alert("Erro ao desarquivar evento: " + (err.message || "Tente novamente"));
+    }
+  };
+
+  const totalAtivos = eventos.filter(ev => !ev.isArquivado).length;
+  const totalArquivados = eventos.filter(ev => ev.isArquivado).length;
+
+  const eventosPorAba = eventos.filter(ev => aba === 'arquivados' ? ev.isArquivado : !ev.isArquivado);
+
+  const eventosFiltrados = eventosPorAba.filter(ev => 
     ev.title?.toLowerCase().includes(busca.toLowerCase()) ||
     ev.location?.toLowerCase().includes(busca.toLowerCase())
   );
@@ -245,7 +330,9 @@ export default function PainelEventosMorais() {
         {/* CABEÇALHO */}
         <div className="flex items-center gap-3 text-[#cccccc] pb-3 border-b border-[#333333]">
           <CalendarDays size={20} strokeWidth={1.5} />
-          <h1 className="text-[17px] tracking-wide">Eventos</h1>
+          <h1 className="text-[17px] tracking-wide">
+            {aba === 'arquivados' ? 'Eventos Arquivados' : 'Eventos'}
+          </h1>
         </div>
 
         {/* BARRA DE PESQUISA */}
@@ -261,8 +348,18 @@ export default function PainelEventosMorais() {
         </div>
 
         {/* CONTAGEM DE LISTA */}
-        <div className="mt-4 mb-3 text-[14px] text-[#999999] tracking-wide shrink-0">
-          Listando <span className="text-[#e5e5e5] font-semibold">{eventosFiltrados.length}</span> eventos
+        <div className="mt-4 mb-3 text-[14px] text-[#999999] tracking-wide shrink-0 flex items-center justify-between">
+          <div>
+            Listando <span className="text-[#e5e5e5] font-semibold">{eventosFiltrados.length}</span> {aba === 'arquivados' ? 'eventos arquivados' : 'eventos'}
+          </div>
+          {aba === 'arquivados' && (
+            <button
+              onClick={() => setAba('ativos')}
+              className="text-xs text-blue-400 hover:text-blue-300 underline font-medium cursor-pointer"
+            >
+              Voltar aos ativos
+            </button>
+          )}
         </div>
 
         {/* ÁREA DE ROLAGEM DOS CARDS */}
@@ -274,8 +371,14 @@ export default function PainelEventosMorais() {
             </div>
           ) : eventosFiltrados.length === 0 ? (
             <div className="text-center py-20 text-[#777] bg-[#222] rounded-sm border border-[#333]">
-              <p className="font-semibold text-[#e5e5e5] mb-1">Nenhum evento encontrado.</p>
-              <p className="text-[13px]">Cadastre o primeiro evento usando o botão abaixo.</p>
+              <p className="font-semibold text-[#e5e5e5] mb-1">
+                {aba === 'arquivados' ? 'Nenhum evento arquivado.' : 'Nenhum evento encontrado.'}
+              </p>
+              <p className="text-[13px]">
+                {aba === 'arquivados' 
+                  ? 'Eventos passados arquivados aparecerão aqui.' 
+                  : 'Cadastre o primeiro evento usando o botão abaixo.'}
+              </p>
             </div>
           ) : (
             eventosFiltrados.map((ev) => (
@@ -291,9 +394,12 @@ export default function PainelEventosMorais() {
                 staffCount={ev.staffCount}
                 isLive={ev.isLive}
                 isPassado={ev.isPassado}
+                isArquivado={ev.isArquivado}
                 selected={ev.selected}
                 router={router} 
                 onDeleteClick={(evInfo) => setConfirmDelete(evInfo)}
+                onArchiveClick={(evInfo) => setConfirmArchive(evInfo)}
+                onUnarchiveClick={(evInfo) => handleDesarquivar(evInfo)}
               />
             ))
           )}
@@ -309,14 +415,43 @@ export default function PainelEventosMorais() {
             Cadastrar evento
           </Link>
 
-          <button className="w-full bg-[#2a2a2a] border border-[#3a3a3a] hover:bg-[#333] text-[#a3a3a3] py-[14px] flex items-center justify-between px-4 rounded-sm transition-colors cursor-pointer">
+          <button 
+            type="button"
+            onClick={() => setShowMaisOpcoes(prev => !prev)}
+            className="w-full bg-[#2a2a2a] border border-[#3a3a3a] hover:bg-[#333] text-[#a3a3a3] py-[14px] flex items-center justify-between px-4 rounded-sm transition-colors cursor-pointer"
+          >
             <div className="flex items-center gap-3 text-[17px] tracking-wide">
               <Filter size={22} strokeWidth={1.5} /> Mais opções...
             </div>
             <div className="p-0.5 border border-[#4a4a4a] rounded-sm bg-[#222]">
-              <ChevronUp size={20} strokeWidth={1.5} className="text-[#999]" />
+              <ChevronUp size={20} strokeWidth={1.5} className={`text-[#999] transition-transform ${showMaisOpcoes ? 'rotate-180' : ''}`} />
             </div>
           </button>
+
+          {showMaisOpcoes && (
+            <div className="bg-[#1f1f1f] border border-[#3a3a3a] rounded-sm p-2 flex flex-col gap-1 -mt-1 shadow-lg">
+              <button
+                type="button"
+                onClick={() => {
+                  setAba(aba === 'ativos' ? 'arquivados' : 'ativos');
+                  setShowMaisOpcoes(false);
+                }}
+                className={`w-full py-2.5 px-3 rounded-sm flex items-center justify-between text-[14px] font-semibold transition-colors cursor-pointer ${
+                  aba === 'arquivados' 
+                    ? 'bg-[#2563eb] text-white' 
+                    : 'bg-[#2a2a2a] hover:bg-[#333] text-[#ccc] border border-[#3a3a3a]'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Archive size={16} />
+                  <span>{aba === 'arquivados' ? 'Exibir eventos ativos' : 'Ver eventos arquivados'}</span>
+                </div>
+                <span className="text-xs bg-black/40 px-2 py-0.5 rounded-full">
+                  {aba === 'arquivados' ? `${totalAtivos} ativos` : `${totalArquivados} arquivados`}
+                </span>
+              </button>
+            </div>
+          )}
 
           <div className="flex items-stretch justify-between border border-[#3a3a3a] bg-[#1a1a1a] rounded-sm overflow-hidden h-[60px]">
             <div className="w-16 flex items-center justify-center opacity-30">
@@ -361,7 +496,7 @@ export default function PainelEventosMorais() {
             </div>
 
             <p className="text-gray-300 text-sm leading-relaxed">
-              Deseja excluir o evento <strong className="text-white font-semibold">"{confirmDelete.title}"</strong>? Todas as escalas deste evento serão removidas.
+              Deseja excluir o evento <strong className="text-white font-semibold">&quot;{confirmDelete.title}&quot;</strong>? Todas as escalas deste evento serão removidas.
             </p>
 
             <div className="flex gap-2 pt-1">
@@ -387,6 +522,61 @@ export default function PainelEventosMorais() {
                   <>
                     <Trash2 size={15} />
                     Excluir
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMAÇÃO DE ARQUIVAMENTO */}
+      {confirmArchive && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-6"
+          onClick={() => !arquivando && setConfirmArchive(null)}
+        >
+          <div 
+            className="bg-[#1e1e1e] border border-[#3a3a3a] rounded-sm p-6 w-full max-w-xs flex flex-col gap-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-950 border border-amber-800 rounded-sm flex items-center justify-center shrink-0">
+                <Archive size={20} className="text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-white font-bold text-base leading-tight">Arquivar evento</h3>
+                <p className="text-gray-400 text-xs mt-0.5">O evento sairá da tela principal</p>
+              </div>
+            </div>
+
+            <p className="text-gray-300 text-sm leading-relaxed">
+              Deseja arquivar o evento <strong className="text-white font-semibold">&quot;{confirmArchive.title}&quot;</strong>? Ele continuará salvo no histórico e poderá ser acessado em &quot;Mais opções...&quot;.
+            </p>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmArchive(null)}
+                disabled={arquivando}
+                className="flex-1 py-3 border border-[#444] bg-[#2a2a2a] text-gray-300 rounded-sm text-sm font-medium hover:bg-[#333] transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmarArquivamento}
+                disabled={arquivando}
+                className="flex-1 py-3 bg-amber-600 hover:bg-amber-500 text-black rounded-sm text-sm font-bold transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                {arquivando ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 size={15} className="animate-spin" /> Arquivando...
+                  </span>
+                ) : (
+                  <>
+                    <Archive size={15} />
+                    Arquivar
                   </>
                 )}
               </button>

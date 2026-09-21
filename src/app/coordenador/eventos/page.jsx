@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { supabase } from "@/lib/supabase";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
@@ -14,12 +14,14 @@ import {
   Filter, 
   ChevronUp, 
   Menu,
-  Loader2 
+  Loader2,
+  Archive,
+  ArchiveRestore
 } from "lucide-react";
 
 // Conexão com o Supabase
 
-const EventCard = ({ id, image, title, location, date, time, client, staffCount, isLive, selected, router }) => {
+const EventCard = ({ id, image, title, location, date, time, client, staffCount, isLive, isPassado, isArquivado, selected, router, onArchiveClick, onUnarchiveClick }) => {
   return (
     <div className="border border-[#3a3a3a] bg-[#222222] flex flex-col mb-4 rounded-sm overflow-hidden shrink-0">
       <div className="h-[100px] w-full relative border-b border-[#3a3a3a] bg-[#1a1a1a]">
@@ -28,6 +30,21 @@ const EventCard = ({ id, image, title, location, date, time, client, staffCount,
         ) : (
           <div className="flex items-center justify-center h-full text-[#666] text-xs">Sem Imagem</div>
         )}
+
+        {isLive ? (
+          <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-black/80 border border-[#22c55e]/50 px-2 py-0.5 rounded-sm text-[#22c55e] text-[11px] font-bold tracking-widest uppercase">
+            <div className="w-2 h-2 bg-[#22c55e] rounded-full animate-pulse"></div> 
+            AO VIVO
+          </div>
+        ) : isArquivado ? (
+          <div className="absolute top-2 right-2 bg-black/80 border border-amber-500/50 px-2 py-0.5 rounded-sm text-amber-400 text-[11px] font-bold tracking-wider uppercase flex items-center gap-1">
+            <Archive size={11} /> Arquivado
+          </div>
+        ) : isPassado ? (
+          <div className="absolute top-2 right-2 bg-black/80 border border-[#555] px-2 py-0.5 rounded-sm text-[#999] text-[11px] font-bold tracking-wider uppercase">
+            Encerrado
+          </div>
+        ) : null}
       </div>
       
       <div className="p-4 relative">
@@ -58,22 +75,41 @@ const EventCard = ({ id, image, title, location, date, time, client, staffCount,
             </div>
           </div>
 
-          <div className="flex flex-col items-end justify-between h-[84px]">
-            {isLive ? (
-              <div className="flex items-center gap-1.5 text-[#e5e5e5] text-[13px] font-bold tracking-widest uppercase">
-                <div className="w-2.5 h-2.5 bg-[#22c55e] rounded-sm"></div> 
-                AO VIVO
-              </div>
-            ) : (
-              <div></div>
+          <div className="flex items-center gap-2">
+            {/* Botão de Arquivar (para eventos encerrados e não arquivados) */}
+            {isPassado && !isArquivado && (
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  onArchiveClick({ id, title });
+                }}
+                title="Arquivar Evento"
+                className="w-11 h-11 border border-amber-900/60 rounded-sm bg-amber-950/40 flex items-center justify-center text-amber-400 hover:bg-amber-950 hover:border-amber-600 hover:text-amber-200 transition-colors cursor-pointer"
+              >
+                <Archive size={19} strokeWidth={1.8} />
+              </button>
             )}
-            
+
+            {/* Botão de Desarquivar (para eventos já arquivados) */}
+            {isArquivado && (
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  onUnarchiveClick({ id, title });
+                }}
+                title="Desarquivar Evento"
+                className="w-11 h-11 border border-blue-900/60 rounded-sm bg-blue-950/40 flex items-center justify-center text-blue-400 hover:bg-blue-950 hover:border-blue-600 hover:text-blue-200 transition-colors cursor-pointer"
+              >
+                <ArchiveRestore size={19} strokeWidth={1.8} />
+              </button>
+            )}
+
             <button 
               onClick={() => router.push(`/coordenador/eventos/${id}`)}
               title="Ver Detalhes do Evento"
               className="w-11 h-11 border border-[#444] rounded-sm bg-[#2a2a2a] flex items-center justify-center text-[#999] hover:bg-[#333] hover:text-[#2563eb] transition-colors cursor-pointer"
             >
-              <Info size={26} strokeWidth={1.5} />
+              <Info size={24} strokeWidth={1.5} />
             </button>
           </div>
         </div>
@@ -88,60 +124,118 @@ export default function PainelEventosCoordenador() {
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState("");
 
-  useEffect(() => {
-    const fetchEventos = async () => {
-      try {
-        const { data: evData, error: evError } = await supabase
-          .from('eventos')
-          .select('*')
-          .order('created_at', { ascending: false });
+  // Estado para arquivamento e visualização
+  const [aba, setAba] = useState("ativos"); // "ativos" | "arquivados"
+  const [showMaisOpcoes, setShowMaisOpcoes] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(null); // { id, title }
+  const [arquivando, setArquivando] = useState(false);
 
-        if (evError) throw evError;
+  const fetchEventos = async () => {
+    try {
+      const { data: evData, error: evError } = await supabase
+        .from('eventos')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-        const { data: escData } = await supabase
-          .from('escalas')
-          .select('evento_id');
+      if (evError) throw evError;
 
-        if (evData) {
-          const eventosFormatados = evData.map(ev => {
-            let dataFormatada = "";
-            let horaFormatada = "";
-            if (ev.data_inicio) {
-              const d = new Date(ev.data_inicio);
-              dataFormatada = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-              horaFormatada = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + " - " + 
-                (ev.data_fim ? new Date(ev.data_fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : "");
-            }
+      const { data: escData } = await supabase
+        .from('escalas')
+        .select('evento_id');
 
-            const count = escData ? escData.filter(esc => esc.evento_id === ev.id).length : 0;
+      if (evData) {
+        const agora = new Date();
+        const eventosFormatados = evData.map(ev => {
+          let dataFormatada = "";
+          let horaFormatada = "";
+          let isPassado = false;
 
-            return {
-              id: ev.id,
-              title: ev.titulo,
-              location: ev.endereco_texto,
-              client: ev.nome_contratante,
-              date: dataFormatada,
-              time: horaFormatada,
-              image: ev.foto_local,
-              staffCount: `${count} escalado(s)`, 
-              isLive: false,
-              selected: true
-            };
-          });
+          if (ev.data_inicio) {
+            const d = new Date(ev.data_inicio);
+            dataFormatada = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+            horaFormatada = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + " - " + 
+              (ev.data_fim ? new Date(ev.data_fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : "");
+            
+            const dataFinal = ev.data_fim ? new Date(ev.data_fim) : d;
+            isPassado = dataFinal < agora;
+          }
 
-          setEventos(eventosFormatados);
-        }
-      } catch (error) {
-        console.error("Erro ao buscar eventos:", error.message);
-      } finally {
-        setLoading(false);
+          const isArquivado = ev.escopo === 'arquivado';
+          const count = escData ? escData.filter(esc => esc.evento_id === ev.id).length : 0;
+
+          return {
+            id: ev.id,
+            title: ev.titulo,
+            location: ev.endereco_texto,
+            client: ev.nome_contratante,
+            date: dataFormatada,
+            time: horaFormatada,
+            image: ev.foto_local,
+            staffCount: `${count} escalado(s)`, 
+            isLive: false,
+            isPassado,
+            isArquivado,
+            selected: true
+          };
+        });
+
+        setEventos(eventosFormatados);
       }
-    };
+    } catch (error) {
+      console.error("Erro ao buscar eventos:", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchEventos();
   }, []);
 
-  const eventosFiltrados = eventos.filter(ev => 
+  const handleConfirmarArquivamento = async () => {
+    if (!confirmArchive) return;
+    setArquivando(true);
+
+    try {
+      const { error } = await supabase
+        .from('eventos')
+        .update({ escopo: 'arquivado' })
+        .eq('id', confirmArchive.id);
+
+      if (error) throw error;
+
+      setEventos(prev => prev.map(e => e.id === confirmArchive.id ? { ...e, isArquivado: true } : e));
+      setConfirmArchive(null);
+    } catch (err) {
+      console.error("Erro ao arquivar evento:", err);
+      alert("Erro ao arquivar evento: " + (err.message || "Tente novamente"));
+    } finally {
+      setArquivando(false);
+    }
+  };
+
+  const handleDesarquivar = async (evInfo) => {
+    try {
+      const { error } = await supabase
+        .from('eventos')
+        .update({ escopo: null })
+        .eq('id', evInfo.id);
+
+      if (error) throw error;
+
+      setEventos(prev => prev.map(e => e.id === evInfo.id ? { ...e, isArquivado: false } : e));
+    } catch (err) {
+      console.error("Erro ao desarquivar evento:", err);
+      alert("Erro ao desarquivar evento: " + (err.message || "Tente novamente"));
+    }
+  };
+
+  const totalAtivos = eventos.filter(ev => !ev.isArquivado).length;
+  const totalArquivados = eventos.filter(ev => ev.isArquivado).length;
+
+  const eventosPorAba = eventos.filter(ev => aba === 'arquivados' ? ev.isArquivado : !ev.isArquivado);
+
+  const eventosFiltrados = eventosPorAba.filter(ev => 
     ev.title?.toLowerCase().includes(busca.toLowerCase()) ||
     ev.location?.toLowerCase().includes(busca.toLowerCase())
   );
@@ -154,7 +248,9 @@ export default function PainelEventosCoordenador() {
         {/* CABEÇALHO */}
         <div className="flex items-center gap-3 text-[#cccccc] pb-3 border-b border-[#333333]">
           <CalendarDays size={20} strokeWidth={1.5} />
-          <h1 className="text-[17px] tracking-wide">Eventos</h1>
+          <h1 className="text-[17px] tracking-wide">
+            {aba === 'arquivados' ? 'Eventos Arquivados' : 'Eventos'}
+          </h1>
         </div>
 
         {/* BARRA DE PESQUISA */}
@@ -170,8 +266,18 @@ export default function PainelEventosCoordenador() {
         </div>
 
         {/* CONTAGEM DE LISTA */}
-        <div className="mt-4 mb-3 text-[14px] text-[#999999] tracking-wide shrink-0">
-          Listando <span className="text-[#e5e5e5] font-semibold">{eventosFiltrados.length}</span> eventos
+        <div className="mt-4 mb-3 text-[14px] text-[#999999] tracking-wide shrink-0 flex items-center justify-between">
+          <div>
+            Listando <span className="text-[#e5e5e5] font-semibold">{eventosFiltrados.length}</span> {aba === 'arquivados' ? 'eventos arquivados' : 'eventos'}
+          </div>
+          {aba === 'arquivados' && (
+            <button
+              onClick={() => setAba('ativos')}
+              className="text-xs text-blue-400 hover:text-blue-300 underline font-medium cursor-pointer"
+            >
+              Voltar aos ativos
+            </button>
+          )}
         </div>
 
         {/* ÁREA DE ROLAGEM DOS CARDS */}
@@ -183,8 +289,14 @@ export default function PainelEventosCoordenador() {
             </div>
           ) : eventosFiltrados.length === 0 ? (
             <div className="text-center py-20 text-[#777] bg-[#222] rounded-sm border border-[#333]">
-              <p className="font-semibold text-[#e5e5e5] mb-1">Nenhum evento encontrado.</p>
-              <p className="text-[13px]">Cadastre o primeiro evento usando o botão abaixo.</p>
+              <p className="font-semibold text-[#e5e5e5] mb-1">
+                {aba === 'arquivados' ? 'Nenhum evento arquivado.' : 'Nenhum evento encontrado.'}
+              </p>
+              <p className="text-[13px]">
+                {aba === 'arquivados' 
+                  ? 'Eventos passados arquivados aparecerão aqui.' 
+                  : 'Cadastre o primeiro evento usando o botão abaixo.'}
+              </p>
             </div>
           ) : (
             eventosFiltrados.map((ev) => (
@@ -199,8 +311,12 @@ export default function PainelEventosCoordenador() {
                 client={ev.client}
                 staffCount={ev.staffCount}
                 isLive={ev.isLive}
+                isPassado={ev.isPassado}
+                isArquivado={ev.isArquivado}
                 selected={ev.selected}
                 router={router} 
+                onArchiveClick={(evInfo) => setConfirmArchive(evInfo)}
+                onUnarchiveClick={(evInfo) => handleDesarquivar(evInfo)}
               />
             ))
           )}
@@ -216,14 +332,43 @@ export default function PainelEventosCoordenador() {
             Cadastrar evento
           </Link>
 
-          <button className="w-full bg-[#2a2a2a] border border-[#3a3a3a] hover:bg-[#333] text-[#a3a3a3] py-[14px] flex items-center justify-between px-4 rounded-sm transition-colors cursor-pointer">
+          <button 
+            type="button"
+            onClick={() => setShowMaisOpcoes(prev => !prev)}
+            className="w-full bg-[#2a2a2a] border border-[#3a3a3a] hover:bg-[#333] text-[#a3a3a3] py-[14px] flex items-center justify-between px-4 rounded-sm transition-colors cursor-pointer"
+          >
             <div className="flex items-center gap-3 text-[17px] tracking-wide">
               <Filter size={22} strokeWidth={1.5} /> Mais opções...
             </div>
             <div className="p-0.5 border border-[#4a4a4a] rounded-sm bg-[#222]">
-              <ChevronUp size={20} strokeWidth={1.5} className="text-[#999]" />
+              <ChevronUp size={20} strokeWidth={1.5} className={`text-[#999] transition-transform ${showMaisOpcoes ? 'rotate-180' : ''}`} />
             </div>
           </button>
+
+          {showMaisOpcoes && (
+            <div className="bg-[#1f1f1f] border border-[#3a3a3a] rounded-sm p-2 flex flex-col gap-1 -mt-1 shadow-lg">
+              <button
+                type="button"
+                onClick={() => {
+                  setAba(aba === 'ativos' ? 'arquivados' : 'ativos');
+                  setShowMaisOpcoes(false);
+                }}
+                className={`w-full py-2.5 px-3 rounded-sm flex items-center justify-between text-[14px] font-semibold transition-colors cursor-pointer ${
+                  aba === 'arquivados' 
+                    ? 'bg-[#2563eb] text-white' 
+                    : 'bg-[#2a2a2a] hover:bg-[#333] text-[#ccc] border border-[#3a3a3a]'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Archive size={16} />
+                  <span>{aba === 'arquivados' ? 'Exibir eventos ativos' : 'Ver eventos arquivados'}</span>
+                </div>
+                <span className="text-xs bg-black/40 px-2 py-0.5 rounded-full">
+                  {aba === 'arquivados' ? `${totalAtivos} ativos` : `${totalArquivados} arquivados`}
+                </span>
+              </button>
+            </div>
+          )}
 
           <div className="flex items-stretch justify-between border border-[#3a3a3a] bg-[#1a1a1a] rounded-sm overflow-hidden h-[60px]">
             <div className="w-16 flex items-center justify-center opacity-30">
@@ -246,6 +391,62 @@ export default function PainelEventosCoordenador() {
         </div>
 
       </div>
+
+      {/* MODAL DE CONFIRMAÇÃO DE ARQUIVAMENTO */}
+      {confirmArchive && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-6"
+          onClick={() => !arquivando && setConfirmArchive(null)}
+        >
+          <div 
+            className="bg-[#1e1e1e] border border-[#3a3a3a] rounded-sm p-6 w-full max-w-xs flex flex-col gap-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-950 border border-amber-800 rounded-sm flex items-center justify-center shrink-0">
+                <Archive size={20} className="text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-white font-bold text-base leading-tight">Arquivar evento</h3>
+                <p className="text-gray-400 text-xs mt-0.5">O evento sairá da tela principal</p>
+              </div>
+            </div>
+
+            <p className="text-gray-300 text-sm leading-relaxed">
+              Deseja arquivar o evento <strong className="text-white font-semibold">&quot;{confirmArchive.title}&quot;</strong>? Ele continuará salvo no histórico e poderá ser acessado em &quot;Mais opções...&quot;.
+            </p>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setConfirmArchive(null)}
+                disabled={arquivando}
+                className="flex-1 py-3 border border-[#444] bg-[#2a2a2a] text-gray-300 rounded-sm text-sm font-medium hover:bg-[#333] transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmarArquivamento}
+                disabled={arquivando}
+                className="flex-1 py-3 bg-amber-600 hover:bg-amber-500 text-black rounded-sm text-sm font-bold transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                {arquivando ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 size={15} className="animate-spin" /> Arquivando...
+                  </span>
+                ) : (
+                  <>
+                    <Archive size={15} />
+                    Arquivar
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
