@@ -112,11 +112,21 @@ export default function DashboardFreelancer() {
           setTotalPago(pago);
 
           const agora = new Date();
-          const futuras = validas.filter(
-            (e) => e.eventos.data_inicio && new Date(e.eventos.data_inicio) >= agora
-          );
+          const ativas = validas.filter((e) => {
+            if (!e.eventos?.data_inicio) return false;
+            if (e.eventos.escopo === "arquivado") return false;
+            const inicio = new Date(e.eventos.data_inicio);
+            let fim = e.eventos.data_fim
+              ? new Date(e.eventos.data_fim)
+              : new Date(inicio.getTime() + 6 * 60 * 60 * 1000);
+            if (fim < inicio) {
+              fim = new Date(fim.getTime() + 24 * 60 * 60 * 1000);
+            }
+            return fim >= agora;
+          });
 
-          setProximaEscala(futuras.length > 0 ? futuras[0] : validas[0] || null);
+          // Apenas seleciona a próxima escala se estiver ativa ou futura. Nunca faz fallback para passadas.
+          setProximaEscala(ativas.length > 0 ? ativas[0] : null);
         }
       } catch (error) {
         console.error("Erro dashboard staff:", error);
@@ -146,6 +156,18 @@ export default function DashboardFreelancer() {
   }
 
   const primeiroNome = perfil?.nome_completo?.split(" ")[0] || "Colaborador";
+
+  const isAoVivo = proximaEscala?.eventos ? (() => {
+    const agora = new Date();
+    const inicio = new Date(proximaEscala.eventos.data_inicio);
+    let fim = proximaEscala.eventos.data_fim
+      ? new Date(proximaEscala.eventos.data_fim)
+      : new Date(inicio.getTime() + 6 * 60 * 60 * 1000);
+    if (fim < inicio) {
+      fim = new Date(fim.getTime() + 24 * 60 * 60 * 1000);
+    }
+    return inicio <= agora && fim >= agora;
+  })() : false;
 
   return (
     <div className="min-h-screen bg-[#141414] text-neutral-300 font-sans flex flex-col justify-between p-4 pb-6">
@@ -193,11 +215,20 @@ export default function DashboardFreelancer() {
         {/* PRÓXIMA ESCALA */}
         <div className="bg-[#1f1f1f] border border-[#333] rounded-sm p-4 space-y-3">
           <div className="flex items-center justify-between border-b border-[#2e2e2e] pb-2">
-            <span className="flex items-center gap-1.5 text-blue-400 text-[11px] font-bold uppercase tracking-wider">
-              <Shield size={13} />
-              <span>Minha Próxima Operação</span>
+            <span className={`flex items-center gap-1.5 ${isAoVivo ? "text-emerald-400" : "text-blue-400"} text-[11px] font-bold uppercase tracking-wider`}>
+              {isAoVivo ? (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Operação em Andamento</span>
+                </>
+              ) : (
+                <>
+                  <Shield size={13} />
+                  <span>Minha Próxima Operação</span>
+                </>
+              )}
             </span>
-            {proximaEscala && (
+            {proximaEscala ? (
               <span
                 className={`text-[10px] px-2 py-0.5 rounded font-bold border ${
                   proximaEscala.status_pagamento
@@ -206,6 +237,10 @@ export default function DashboardFreelancer() {
                 }`}
               >
                 {proximaEscala.status_pagamento ? "Paga ✅" : "Pendente ⏳"}
+              </span>
+            ) : (
+              <span className="text-[10px] text-neutral-500 font-mono">
+                Nenhuma ativa
               </span>
             )}
           </div>
@@ -330,11 +365,24 @@ export default function DashboardFreelancer() {
               </div>
             </div>
           ) : (
-            <div className="text-center py-6 text-neutral-500 text-xs">
-              <p>Nenhuma escala ativa no momento.</p>
-              <p className="text-[10px] text-neutral-600 mt-1">
-                Você será notificado por e-mail quando for escalado.
+            <div className="py-6 px-3 text-center flex flex-col items-center justify-center gap-2">
+              <div className="w-10 h-10 rounded-full bg-neutral-800/80 border border-neutral-700/60 flex items-center justify-center text-neutral-500 mb-0.5">
+                <Calendar size={18} />
+              </div>
+              <p className="text-[13px] font-semibold text-neutral-300">
+                Nenhuma escala ativa no momento
               </p>
+              <p className="text-[11px] text-neutral-500 max-w-[240px] leading-relaxed">
+                Você será notificado por e-mail assim que for selecionado para uma nova operação.
+              </p>
+              <div className="pt-2">
+                <Link
+                  href="/freelancers/eventos"
+                  className="bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-300 text-[12px] font-bold px-3.5 py-2 rounded transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  Ver histórico de escalas
+                </Link>
+              </div>
             </div>
           )}
         </div>

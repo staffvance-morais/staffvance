@@ -129,56 +129,90 @@ export default function MinhasEscalas() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {escalas.map((escala, index) => {
-              const evento = escala.eventos;
-              const isProximo = index === 0;
-              const temMapa =
-                evento.mapa_tatico === true ||
-                evento.endereco_texto?.includes("Presidente Vargas");
+            {(() => {
+              const agora = new Date();
+              const proximaId = escalas.find((e) => {
+                if (!e.eventos?.data_inicio) return false;
+                const ini = new Date(e.eventos.data_inicio);
+                let fim = e.eventos.data_fim ? new Date(e.eventos.data_fim) : new Date(ini.getTime() + 6 * 60 * 60 * 1000);
+                if (fim < ini) fim = new Date(fim.getTime() + 24 * 60 * 60 * 1000);
+                return fim >= agora;
+              })?.id;
 
-              const dataObj = evento.data_inicio
-                ? new Date(evento.data_inicio)
-                : null;
-              const dataExibicao = dataObj
-                ? dataObj.toLocaleDateString("pt-BR", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                  })
-                : "A definir";
-              const horaExibicao = dataObj
-                ? dataObj.toLocaleTimeString("pt-BR", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                : "A definir";
+              return escalas.map((escala) => {
+                const evento = escala.eventos;
+                const inicio = evento.data_inicio ? new Date(evento.data_inicio) : null;
+                let fim = evento.data_fim ? new Date(evento.data_fim) : (inicio ? new Date(inicio.getTime() + 6 * 60 * 60 * 1000) : null);
+                if (inicio && fim && fim < inicio) {
+                  fim = new Date(fim.getTime() + 24 * 60 * 60 * 1000);
+                }
+                const isPassado = fim ? fim < agora : false;
+                const isAoVivo = inicio && fim ? (inicio <= agora && fim >= agora) : false;
+                const isProximo = escala.id === proximaId;
+                const temMapa =
+                  evento.mapa_tatico === true ||
+                  evento.endereco_texto?.includes("Presidente Vargas");
 
-              return (
-                <div
-                  key={escala.id}
-                  className={`border-2 bg-neutral-800 p-4 flex flex-col gap-3 transition-colors shadow-lg ${
-                    isProximo
-                      ? "border-neutral-500"
-                      : "border-neutral-700"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2 border-b border-neutral-700 pb-2.5">
-                    <div className="overflow-hidden">
-                      {isProximo && (
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 block">
-                          Próximo Evento
-                        </span>
-                      )}
-                      <h3 className="truncate text-lg font-bold text-white">
-                        {evento.titulo}
-                      </h3>
+                const dataObj = evento.data_inicio
+                  ? new Date(evento.data_inicio)
+                  : null;
+                const dataExibicao = dataObj
+                  ? dataObj.toLocaleDateString("pt-BR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                    })
+                  : "A definir";
+                const horaExibicao = dataObj
+                  ? dataObj.toLocaleTimeString("pt-BR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "A definir";
+
+                return (
+                  <div
+                    key={escala.id}
+                    className={`border-2 bg-neutral-800 p-4 flex flex-col gap-3 transition-colors shadow-lg ${
+                      isAoVivo
+                        ? "border-emerald-500/80"
+                        : isProximo
+                        ? "border-blue-500/80"
+                        : isPassado
+                        ? "border-neutral-700/60 opacity-85"
+                        : "border-neutral-700"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 border-b border-neutral-700 pb-2.5">
+                      <div className="overflow-hidden">
+                        {isAoVivo ? (
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1 mb-0.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            Ao Vivo / Hoje
+                          </span>
+                        ) : isProximo ? (
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-blue-400 block mb-0.5">
+                            Próximo Evento
+                          </span>
+                        ) : isPassado ? (
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 block mb-0.5">
+                            Evento Encerrado
+                          </span>
+                        ) : null}
+                        <h3 className="truncate text-lg font-bold text-white">
+                          {evento.titulo}
+                        </h3>
+                      </div>
+
+                      <div className={`flex items-center gap-1 shrink-0 border px-2 py-0.5 text-xs font-semibold uppercase ${
+                        isPassado
+                          ? "border-neutral-700 bg-neutral-800 text-neutral-400"
+                          : "border-green-600/40 bg-green-950/40 text-green-400"
+                      }`}>
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        <span>{isPassado ? "Concluído" : "Confirmado"}</span>
+                      </div>
                     </div>
-
-                    <div className="flex items-center gap-1 shrink-0 border border-green-600/40 bg-green-950/40 px-2 py-0.5 text-green-400 text-xs font-semibold uppercase">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      <span>Confirmado</span>
-                    </div>
-                  </div>
 
                   <div className="flex flex-col gap-2 text-sm text-neutral-300">
                     <div className="flex items-center gap-2.5">
@@ -284,7 +318,8 @@ export default function MinhasEscalas() {
                   )}
                 </div>
               );
-            })}
+            });
+          })()}
           </div>
         )}
       </main>

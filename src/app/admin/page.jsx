@@ -77,12 +77,18 @@ export default function AdminPage() {
         });
 
         const agora = new Date();
-        const eventosFuturos = (eventosData || []).filter((ev) => {
-          if (!ev.data_inicio) return false;
-          return new Date(ev.data_inicio) >= agora;
+        const eventosAtivos = (eventosData || []).filter((ev) => {
+          if (!ev.data_inicio || ev.escopo === "arquivado") return false;
+          const inicio = new Date(ev.data_inicio);
+          let fim = ev.data_fim ? new Date(ev.data_fim) : new Date(inicio.getTime() + 6 * 60 * 60 * 1000);
+          if (fim < inicio) {
+            fim = new Date(fim.getTime() + 24 * 60 * 60 * 1000);
+          }
+          return fim >= agora;
         });
 
-        const eventoFoco = eventosFuturos.length > 0 ? eventosFuturos[0] : (eventosData && eventosData[0] ? eventosData[0] : null);
+        // Seleciona apenas a primeira operação ativa/futura. Se todas já passaram, permanece null.
+        const eventoFoco = eventosAtivos.length > 0 ? eventosAtivos[0] : null;
         setProximoEvento(eventoFoco);
 
         if (eventoFoco) {
@@ -91,6 +97,8 @@ export default function AdminPage() {
             .select("*", { count: "exact", head: true })
             .eq("evento_id", eventoFoco.id);
           setTotalEscaladosProximo(count || 0);
+        } else {
+          setTotalEscaladosProximo(0);
         }
       } catch (err) {
         console.error("Erro dashboard admin:", err);
@@ -113,6 +121,16 @@ export default function AdminPage() {
   }
 
   const primeiroNome = perfil?.nome_completo?.split(" ")[0] || "Administrador";
+
+  const isAoVivo = proximoEvento ? (() => {
+    const agora = new Date();
+    const inicio = new Date(proximoEvento.data_inicio);
+    let fim = proximoEvento.data_fim ? new Date(proximoEvento.data_fim) : new Date(inicio.getTime() + 6 * 60 * 60 * 1000);
+    if (fim < inicio) {
+      fim = new Date(fim.getTime() + 24 * 60 * 60 * 1000);
+    }
+    return inicio <= agora && fim >= agora;
+  })() : false;
 
   return (
     <div className="min-h-screen bg-[#141414] text-neutral-300 font-sans flex flex-col justify-between p-4 pb-6">
@@ -182,14 +200,23 @@ export default function AdminPage() {
         {/* PRÓXIMA OPERAÇÃO (FOCO PRINCIPAL) */}
         <div className="bg-[#1f1f1f] border border-[#333] rounded-sm p-4 space-y-3">
           <div className="flex items-center justify-between border-b border-[#2e2e2e] pb-2">
-            <span className="flex items-center gap-1.5 text-blue-400 text-[11px] font-bold uppercase tracking-wider">
-              <Shield size={13} />
-              <span>Próxima Operação</span>
+            <span className={`flex items-center gap-1.5 ${isAoVivo ? "text-emerald-400" : "text-blue-400"} text-[11px] font-bold uppercase tracking-wider`}>
+              {isAoVivo ? (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Operação em Andamento</span>
+                </>
+              ) : (
+                <>
+                  <Shield size={13} />
+                  <span>Próxima Operação</span>
+                </>
+              )}
             </span>
             <span className="text-[10px] text-neutral-400 font-mono">
               {proximoEvento?.data_inicio
                 ? new Date(proximoEvento.data_inicio).toLocaleDateString("pt-BR")
-                : "Sem data"}
+                : "Nenhuma ativa"}
             </span>
           </div>
 
@@ -239,14 +266,30 @@ export default function AdminPage() {
               </div>
             </div>
           ) : (
-            <div className="text-center py-6 text-neutral-500 text-xs">
-              <p>Nenhuma operação agendada.</p>
-              <button
-                onClick={() => router.push("/admin/eventos/cadastrar")}
-                className="mt-2 text-blue-400 hover:underline font-bold"
-              >
-                + Criar Novo Evento
-              </button>
+            <div className="py-6 px-3 text-center flex flex-col items-center justify-center gap-2">
+              <div className="w-10 h-10 rounded-full bg-neutral-800/80 border border-neutral-700/60 flex items-center justify-center text-neutral-500 mb-0.5">
+                <Calendar size={18} />
+              </div>
+              <p className="text-[13px] font-semibold text-neutral-300">
+                Nenhuma operação futura agendada
+              </p>
+              <p className="text-[11px] text-neutral-500 max-w-[240px] leading-relaxed">
+                Todas as operações anteriores já foram concluídas ou arquivadas.
+              </p>
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  onClick={() => router.push("/admin/eventos/cadastrar")}
+                  className="bg-blue-600 hover:bg-blue-500 text-white text-[12px] font-bold px-3.5 py-2 rounded transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  + Nova Operação
+                </button>
+                <Link
+                  href="/admin/eventos"
+                  className="text-neutral-400 hover:text-white text-[11px] font-medium transition-colors"
+                >
+                  Ver histórico
+                </Link>
+              </div>
             </div>
           )}
         </div>
