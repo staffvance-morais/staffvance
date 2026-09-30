@@ -2,7 +2,7 @@
 import { supabase } from "@/lib/supabase";
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { CalendarDays, ChevronRight, User, Info, Menu, Loader2, Shirt } from "lucide-react";
+import { CalendarDays, ChevronRight, User, Info, Menu, Loader2, Shirt, Pencil } from "lucide-react";
 
 export default function SelecionarSetorEscalaCoordenador() {
   const router = useRouter();
@@ -11,6 +11,7 @@ export default function SelecionarSetorEscalaCoordenador() {
 
   const [loading, setLoading] = useState(true);
   const [salvandoSetor, setSalvandoSetor] = useState(false);
+  const [editandoSetor, setEditandoSetor] = useState(null);
   const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
   const [relatorioEnviado, setRelatorioEnviado] = useState(false);
   const [escalas, setEscalas] = useState([]);
@@ -29,7 +30,6 @@ export default function SelecionarSetorEscalaCoordenador() {
           .from("escalas")
           .select("id, setor, staff_id, perfis ( id, nome_completo )")
           .eq("evento_id", eventoId);
-
         if (escalasError) {
           console.error("Erro ao buscar escalas:", escalasError);
         } else if (escalasData) {
@@ -98,6 +98,53 @@ export default function SelecionarSetorEscalaCoordenador() {
       } finally {
         setSalvandoSetor(false);
       }
+    }
+  };
+
+  const handleEditarSetor = async (setorAntigo) => {
+    const novoNome = window.prompt("Digite o novo nome para o setor:", setorAntigo);
+    if (novoNome === null) return;
+
+    const nomeLimpo = novoNome.trim();
+    if (!nomeLimpo || nomeLimpo === setorAntigo) return;
+
+    if (setores.some(s => s.toLowerCase() === nomeLimpo.toLowerCase() && s.toLowerCase() !== setorAntigo.toLowerCase())) {
+      alert("Este setor já existe na lista.");
+      return;
+    }
+
+    setEditandoSetor(setorAntigo);
+    try {
+      // 1. Atualiza no estado local dos setores mantendo a ordem
+      setSetores(prev => prev.map(s => s === setorAntigo ? nomeLimpo : s));
+
+      // 2. Atualiza escalas no estado local
+      setEscalas(prev => prev.map(e => e.setor === setorAntigo ? { ...e, setor: nomeLimpo } : e));
+
+      // 3. Atualiza setores_extras do evento no banco Supabase
+      const { data: evData } = await supabase.from('eventos').select('setores_extras').eq('id', eventoId).single();
+      const extrasAtuais = evData?.setores_extras || [];
+      let extrasAtualizados;
+      if (extrasAtuais.includes(setorAntigo)) {
+        extrasAtualizados = extrasAtuais.map(s => s === setorAntigo ? nomeLimpo : s);
+      } else {
+        extrasAtualizados = [...extrasAtuais, nomeLimpo];
+      }
+
+      await supabase.from('eventos').update({ setores_extras: extrasAtualizados }).eq('id', eventoId);
+
+      // 4. Atualiza todas as escalas existentes que estavam com o nome antigo deste setor
+      await supabase
+        .from('escalas')
+        .update({ setor: nomeLimpo })
+        .eq('evento_id', eventoId)
+        .eq('setor', setorAntigo);
+
+    } catch (error) {
+      console.error("Erro ao editar o setor:", error);
+      alert("Erro ao editar o setor.");
+    } finally {
+      setEditandoSetor(null);
     }
   };
 
@@ -173,12 +220,29 @@ export default function SelecionarSetorEscalaCoordenador() {
                             <div className="w-2 h-2 bg-[#16a34a] rounded-sm"></div>CHEIO
                           </div>
                         )}
-                        <button 
-                          onClick={() => router.push(`/coordenador/eventos/${eventoId}/alocar?setor=${encodeURIComponent(nomeSetor)}`)}
-                          className="w-10 h-10 border border-[#555] rounded-sm flex items-center justify-center text-[#999] hover:bg-[#333] hover:text-[#e5e5e5] transition-colors mt-1 cursor-pointer"
-                        >
-                          <Info size={22} strokeWidth={1.5} />
-                        </button>
+                        <div className="flex items-center gap-2 mt-1">
+                          <button 
+                            type="button"
+                            onClick={() => handleEditarSetor(nomeSetor)}
+                            disabled={editandoSetor === nomeSetor}
+                            title="Editar nome do setor"
+                            className="w-10 h-10 border border-[#555] rounded-sm flex items-center justify-center text-[#999] hover:bg-[#333] hover:text-[#e5e5e5] transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            {editandoSetor === nomeSetor ? (
+                              <Loader2 className="animate-spin text-[#2563eb]" size={18} />
+                            ) : (
+                              <Pencil size={18} strokeWidth={1.5} />
+                            )}
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => router.push(`/coordenador/eventos/${eventoId}/alocar?setor=${encodeURIComponent(nomeSetor)}`)}
+                            title="Alocar membros"
+                            className="w-10 h-10 border border-[#555] rounded-sm flex items-center justify-center text-[#999] hover:bg-[#333] hover:text-[#e5e5e5] transition-colors cursor-pointer"
+                          >
+                            <Info size={22} strokeWidth={1.5} />
+                          </button>
+                        </div>
                       </div>
                     </div>
 
