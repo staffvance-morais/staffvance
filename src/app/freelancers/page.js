@@ -16,6 +16,7 @@ import {
   Check,
   Camera,
   CheckCheck,
+  Edit3,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import HeaderSuperior from "@/components/HeaderSuperior";
@@ -387,25 +388,36 @@ export default function DashboardFreelancer() {
           )}
         </div>
 
-        {/* CHAVE PIX DISCRETA */}
-        {perfil?.chave_pix && (
-          <div className="bg-[#1a1a1a] border border-[#2b2b2b] p-2.5 rounded flex items-center justify-between text-[11px]">
-            <div className="flex items-center gap-1.5 text-neutral-400 min-w-0">
-              <Wallet size={12} className="text-emerald-400 shrink-0" />
-              <span className="font-semibold">Pix:</span>
-              <span className="text-neutral-300 truncate font-mono text-[10px]">
-                {perfil.chave_pix}
-              </span>
-            </div>
-            <button
-              onClick={copiarMinhaChavePix}
-              className="px-2 py-0.5 bg-[#262626] hover:bg-[#333] text-neutral-300 text-[10px] font-bold rounded flex items-center gap-1 shrink-0 cursor-pointer"
-            >
-              {pixCopiado ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
-              <span>{pixCopiado ? "Copiado!" : "Copiar"}</span>
-            </button>
+        {/* CHAVE PIX DISCRETA / GERENCIAR DADOS */}
+        <div className="bg-[#1a1a1a] border border-[#2b2b2b] p-2.5 rounded flex items-center justify-between text-[11px]">
+          <div className="flex items-center gap-1.5 text-neutral-400 min-w-0">
+            <Wallet size={12} className="text-emerald-400 shrink-0" />
+            <span className="font-semibold">Pix:</span>
+            <span className={`truncate font-mono text-[10px] ${perfil?.chave_pix ? "text-neutral-300" : "text-amber-400/80 italic"}`}>
+              {perfil?.chave_pix || "Não cadastrada"}
+            </span>
           </div>
-        )}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {perfil?.chave_pix && (
+              <button
+                type="button"
+                onClick={copiarMinhaChavePix}
+                className="px-2 py-0.5 bg-[#262626] hover:bg-[#333] text-neutral-300 text-[10px] font-bold rounded flex items-center gap-1 shrink-0 cursor-pointer"
+              >
+                {pixCopiado ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
+                <span>{pixCopiado ? "Copiado!" : "Copiar"}</span>
+              </button>
+            )}
+            <Link
+              href="/perfil"
+              className="px-2 py-0.5 bg-[#262626] hover:bg-[#333] text-neutral-300 hover:text-white text-[10px] font-bold rounded flex items-center gap-1 shrink-0 cursor-pointer border border-[#383838]"
+              title="Gerenciar dados pessoais e chave Pix"
+            >
+              <Edit3 size={10} />
+              <span>{perfil?.chave_pix ? "Editar" : "Cadastrar"}</span>
+            </Link>
+          </div>
+        </div>
 
         {/* MENU INFERIOR */}
         <AppNavigation userProfile={perfil} userRole="staff" />

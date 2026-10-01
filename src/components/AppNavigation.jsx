@@ -28,26 +28,31 @@ const ROLE_MENUS = {
     { label: "Clientes", href: "/admin/clientes", icon: Handshake },
     { label: "Eventos", href: "/admin/eventos", icon: Calendar },
     { label: "Financeiro", href: "/admin/financeiro", icon: Wallet },
+    { label: "Meu Perfil", href: "/perfil", icon: UserRound },
   ],
   coordenador: [
     { label: "Página inicial", href: "/coordenador", icon: Home },
     { label: "Equipe", href: "/coordenador/equipe", icon: Contact },
     { label: "Clientes", href: "/coordenador/clientes", icon: Handshake },
     { label: "Eventos", href: "/coordenador/eventos", icon: Calendar },
+    { label: "Meu Perfil", href: "/perfil", icon: UserRound },
   ],
   producao: [
     { label: "Página inicial", href: "/producao", icon: Home },
     { label: "Equipe", href: "/producao/equipe", icon: Contact },
     { label: "Clientes", href: "/producao/clientes", icon: Handshake },
     { label: "Eventos", href: "/producao/eventos", icon: Calendar },
+    { label: "Meu Perfil", href: "/perfil", icon: UserRound },
   ],
   staff: [
     { label: "Página inicial", href: "/freelancers", icon: Home },
     { label: "Eventos", href: "/freelancers/eventos", icon: Calendar },
+    { label: "Meu Perfil", href: "/perfil", icon: UserRound },
   ],
   freelancer: [
     { label: "Página inicial", href: "/freelancers", icon: Home },
     { label: "Eventos", href: "/freelancers/eventos", icon: Calendar },
+    { label: "Meu Perfil", href: "/perfil", icon: UserRound },
   ],
 };
 
@@ -237,8 +242,13 @@ export default function AppNavigation({
               </div>
 
               <div className="border-2 border-neutral-600 bg-neutral-700 p-4 flex items-center justify-between gap-3 shrink-0">
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="relative h-14 w-14 shrink-0 overflow-hidden border border-neutral-600 bg-neutral-900 flex items-center justify-center">
+                <Link
+                  href="/perfil"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="flex items-center gap-3 overflow-hidden flex-1 group cursor-pointer"
+                  title="Editar dados pessoais"
+                >
+                  <div className="relative h-14 w-14 shrink-0 overflow-hidden border border-neutral-600 bg-neutral-900 flex items-center justify-center group-hover:border-neutral-400 transition-colors">
                     {profile?.foto_url ? (
                       <Image
                         src={profile.foto_url}
@@ -253,14 +263,14 @@ export default function AppNavigation({
                   </div>
 
                   <div className="flex flex-col text-left overflow-hidden">
-                    <span className="truncate text-lg font-semibold text-white leading-tight">
+                    <span className="truncate text-lg font-semibold text-white leading-tight group-hover:text-blue-400 transition-colors">
                       {displayName}
                     </span>
-                    <span className="text-xs text-neutral-400">
-                      Toque para saber mais
+                    <span className="text-xs text-neutral-400 group-hover:text-neutral-200 transition-colors">
+                      Editar dados pessoais
                     </span>
                   </div>
-                </div>
+                </Link>
 
                 <button
                   type="button"

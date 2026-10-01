@@ -14,10 +14,15 @@ import {
   LockKeyhole,
   KeyRound,
   ChevronRight,
+  UserRound,
 } from "lucide-react";
 import Divider from "./Divider";
 
 const ROUTE_CONFIG = {
+  "/perfil": {
+    icon: UserRound,
+    items: [{ label: "Meu Perfil" }],
+  },
   "/cadastro": {
     icon: SmilePlus,
     items: [{ label: "Cadastre-se" }],
