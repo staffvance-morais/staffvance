@@ -311,7 +311,7 @@ export default function MinhasEscalas() {
                     )}
                   </div>
 
-                  {escala.status_pagamento && (
+                  {(escala.status_pagamento === true || escala.status_pagamento === "true") && (
                     <div className="border border-green-600/30 bg-green-950/30 px-3 py-1 text-center text-xs font-bold uppercase text-green-400">
                       Pagamento Liberado
                     </div>

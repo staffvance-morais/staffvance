@@ -241,7 +241,7 @@ export default function GestaoFinanceira() {
       const eventosProcessados = (evData || []).map((ev) => {
         const escalasDoEvento = (escData || []).filter((e) => e.evento_id === ev.id);
         const custoStaff = escalasDoEvento.reduce((acc, curr) => acc + (parseFloat(curr.valor_pago) || 0), 0);
-        const todosPagos = escalasDoEvento.length > 0 && escalasDoEvento.every((e) => e.status_pagamento === true);
+        const todosPagos = escalasDoEvento.length > 0 && escalasDoEvento.every((e) => e.status_pagamento === true || e.status_pagamento === "true");
 
         const despesasLista = Array.isArray(ev.despesas) ? ev.despesas : [];
         const custoImpostos = despesasLista

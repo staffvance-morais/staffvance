@@ -216,7 +216,7 @@ export default function AcertoFinanceiro() {
         const equipeFormatada = (escData || []).map((item) => ({
           ...item,
           valor_pago: item.valor_pago !== null && item.valor_pago !== undefined ? item.valor_pago : "",
-          status_pagamento: item.status_pagamento || false,
+          status_pagamento: item.status_pagamento === true || item.status_pagamento === "true",
           status_presenca: item.status_presenca || (item.checkin_em ? "presente" : "pendente"),
         }));
 
@@ -407,11 +407,13 @@ export default function AcertoFinanceiro() {
   };
 
   const handleTogglePagamento = async (staff) => {
-    const novoStatus = !staff.status_pagamento;
+    const isPagoAtual = staff.status_pagamento === true || staff.status_pagamento === "true";
+    const novoStatus = !isPagoAtual;
     setEquipe((prev) => prev.map((m) => (m.id === staff.id ? { ...m, status_pagamento: novoStatus } : m)));
 
     try {
-      await supabase.from("escalas").update({ status_pagamento: novoStatus }).eq("id", staff.id);
+      const { error } = await supabase.from("escalas").update({ status_pagamento: novoStatus }).eq("id", staff.id);
+      if (error) throw error;
 
       const valorStaff = parseFloat(staff.valor_pago || 0);
       if (novoStatus && staff.perfis?.email && valorStaff > 0) {
@@ -422,13 +424,15 @@ export default function AcertoFinanceiro() {
           { titulo: evento?.titulo || "Operação Wadjet" },
           valorFormatado
         );
-        if (res.success) {
+        if (res?.success) {
           setMensagemSucesso(`E-mail de comprovante enviado para ${staff.perfis.nome_completo}!`);
           setTimeout(() => setMensagemSucesso(""), 4000);
         }
       }
     } catch (error) {
-      console.error(error);
+      console.error("Erro ao atualizar pagamento:", error);
+      // Reverte em caso de falha
+      setEquipe((prev) => prev.map((m) => (m.id === staff.id ? { ...m, status_pagamento: isPagoAtual } : m)));
       alert("Erro ao atualizar status de pagamento.");
     }
   };
@@ -464,7 +468,8 @@ export default function AcertoFinanceiro() {
       setEquipe((prev) => prev.map((m) => idsPagos.has(m.id) ? { ...m, status_pagamento: true } : m));
 
       for (const staff of listaParaPagar) {
-        await supabase.from("escalas").update({ status_pagamento: true }).eq("id", staff.id);
+        const { error } = await supabase.from("escalas").update({ status_pagamento: true }).eq("id", staff.id);
+        if (error) console.error("Erro ao marcar staff como pago:", staff.id, error);
       }
       setMensagemSucesso(`${listaParaPagar.length} colaborador(es) marcados como pagos com sucesso!`);
       setTimeout(() => setMensagemSucesso(""), 4000);
@@ -542,13 +547,17 @@ export default function AcertoFinanceiro() {
 
       // 2. Atualiza valores e status da equipe
       for (const staff of equipe) {
-        await supabase
+        const isPago = staff.status_pagamento === true || staff.status_pagamento === "true";
+        const { error: escUpdateError } = await supabase
           .from("escalas")
           .update({
             valor_pago: parseFloat(staff.valor_pago) || 0,
-            status_pagamento: staff.status_pagamento || false,
+            status_pagamento: isPago,
           })
           .eq("id", staff.id);
+        if (escUpdateError) {
+          console.error("Erro ao salvar escala:", staff.id, escUpdateError);
+        }
       }
 
       setMensagemSucesso("Balanço financeiro, despesas e impostos salvos com sucesso!");
@@ -571,10 +580,11 @@ export default function AcertoFinanceiro() {
   const equipeFiltrada = equipe.filter((staff) => {
     const isPresente = staff.status_presenca === "presente" || !!staff.checkin_em;
     const isFalta = staff.status_presenca === "falta";
+    const isPago = staff.status_pagamento === true || staff.status_pagamento === "true";
 
     let atendeFiltroStatus = true;
-    if (filtroEquipe === "pagos") atendeFiltroStatus = staff.status_pagamento === true;
-    else if (filtroEquipe === "pendentes_pgto") atendeFiltroStatus = staff.status_pagamento === false;
+    if (filtroEquipe === "pagos") atendeFiltroStatus = isPago;
+    else if (filtroEquipe === "pendentes_pgto") atendeFiltroStatus = !isPago;
     else if (filtroEquipe === "presentes") atendeFiltroStatus = isPresente;
     else if (filtroEquipe === "faltas") atendeFiltroStatus = isFalta;
 
@@ -1354,7 +1364,7 @@ export default function AcertoFinanceiro() {
                       filtroEquipe === "pendentes_pgto" ? "bg-amber-500 text-black font-extrabold" : "text-[#888] hover:text-white"
                     }`}
                   >
-                    A Pagar ({equipe.filter((m) => !m.status_pagamento).length})
+                    A Pagar ({equipe.filter((m) => !(m.status_pagamento === true || m.status_pagamento === "true")).length})
                   </button>
 
                   <button
@@ -1364,7 +1374,7 @@ export default function AcertoFinanceiro() {
                       filtroEquipe === "pagos" ? "bg-green-600 text-white font-extrabold" : "text-[#888] hover:text-white"
                     }`}
                   >
-                    Pagos ({equipe.filter((m) => m.status_pagamento).length})
+                    Pagos ({equipe.filter((m) => (m.status_pagamento === true || m.status_pagamento === "true")).length})
                   </button>
                 </div>
               </div>
@@ -1422,28 +1432,33 @@ export default function AcertoFinanceiro() {
                       </div>
 
                       {/* BOTÃO TOGGLE PAGAMENTO */}
-                      <button
-                        type="button"
-                        onClick={() => handleTogglePagamento(staff)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-bold uppercase border transition-all cursor-pointer shrink-0 print:border-gray-400 ${
-                          staff.status_pagamento
-                            ? "bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20"
-                            : "bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20"
-                        }`}
-                        title={staff.status_pagamento ? "Clique para reverter para pendente" : "Clique para marcar como pago e notificar"}
-                      >
-                        {staff.status_pagamento ? (
-                          <>
-                            <CheckCircle2 size={14} className="text-green-400" />
-                            <span>Pago</span>
-                          </>
-                        ) : (
-                          <>
-                            <Circle size={14} className="text-amber-400" />
-                            <span>Pendente</span>
-                          </>
-                        )}
-                      </button>
+                      {(() => {
+                        const isPago = staff.status_pagamento === true || staff.status_pagamento === "true";
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePagamento(staff)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-bold uppercase border transition-all cursor-pointer shrink-0 print:border-gray-400 ${
+                              isPago
+                                ? "bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20"
+                                : "bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20"
+                            }`}
+                            title={isPago ? "Clique para reverter para pendente" : "Clique para marcar como pago e notificar"}
+                          >
+                            {isPago ? (
+                              <>
+                                <CheckCircle2 size={14} className="text-green-400" />
+                                <span>Pago</span>
+                              </>
+                            ) : (
+                              <>
+                                <Circle size={14} className="text-amber-400" />
+                                <span>Pendente</span>
+                              </>
+                            )}
+                          </button>
+                        );
+                      })()}
                     </div>
 
                     {/* BLOCO DE PRESENÇA CONFIRMADA & SELFIE */}

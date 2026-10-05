@@ -102,7 +102,8 @@ export default function DashboardFreelancer() {
 
           validas.forEach((e) => {
             const valor = parseFloat(e.valor_pago) || parseFloat(e.eventos?.valor_diaria) || 0;
-            if (e.status_pagamento) {
+            const isPago = e.status_pagamento === true || e.status_pagamento === "true";
+            if (isPago) {
               pago += valor;
             } else {
               pendente += valor;
@@ -229,17 +230,20 @@ export default function DashboardFreelancer() {
                 </>
               )}
             </span>
-            {proximaEscala ? (
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded font-bold border ${
-                  proximaEscala.status_pagamento
-                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                    : "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                }`}
-              >
-                {proximaEscala.status_pagamento ? "Paga ✅" : "Pendente ⏳"}
-              </span>
-            ) : (
+            {proximaEscala ? (() => {
+              const proximaPaga = proximaEscala.status_pagamento === true || proximaEscala.status_pagamento === "true";
+              return (
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded font-bold border ${
+                    proximaPaga
+                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                      : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                  }`}
+                >
+                  {proximaPaga ? "Paga ✅" : "Pendente ⏳"}
+                </span>
+              );
+            })() : (
               <span className="text-[10px] text-neutral-500 font-mono">
                 Nenhuma ativa
               </span>
