@@ -1,0 +1,31 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # Executa todos os dias às 06:00 e às 18:00 UTC (03:00 e 15:00 no horário de Brasília)
+    - cron: '0 6,18 * * *'
+  workflow_dispatch: # Permite executar manualmente pelo painel do GitHub na aba Actions
+
+jobs:
+  ping:
+    name: Despertar Supabase
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar rota de ping do StaffVance
+        run: |
+          echo "Disparando despertador do Supabase..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" https://gerenciador.wadjet.seg.br/api/ping)
+          BODY=$(echo "$RESPONSE" | sed -e '$d')
+          STATUS=$(echo "$RESPONSE" | tail -n 1 | cut -d: -f2)
+
+          echo "Resposta do servidor: $BODY"
+          echo "Status HTTP: $STATUS"
+
+          if [ "$STATUS" -ne 200 ]; then
+            echo "Aviso: Rota /api/ping retornou status $STATUS. Acionando contingência direta..."
+            curl -s -f "https://retmrtitspvdfkbglcpu.supabase.co/rest/v1/perfis?select=id&limit=1" \
+              -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJldG1ydGl0c3B2ZGZrYmdsY3B1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwMzk1MTMsImV4cCI6MjA5OTYxNTUxM30.A0YnbjqznUr6ngeNxpceLDZ3GmX9cTDj7XhqKHa49Eo" \
+              && echo "Contingência direta executada com sucesso!" || exit 1
+          else
+            echo "Banco de dados acordado com sucesso!"
+          fi
