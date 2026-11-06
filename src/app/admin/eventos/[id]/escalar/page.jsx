@@ -2,7 +2,7 @@
 import { supabase } from "@/lib/supabase";
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { CalendarDays, ChevronRight, User, Info, Menu, Loader2, Shirt, Pencil } from "lucide-react";
+import { CalendarDays, ChevronRight, User, Info, Menu, Loader2, Shirt, Pencil, Send, Mail } from "lucide-react";
 
 export default function SelecionarSetorEscala() {
   const router = useRouter();
@@ -14,6 +14,8 @@ export default function SelecionarSetorEscala() {
   const [editandoSetor, setEditandoSetor] = useState(null);
   const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
   const [relatorioEnviado, setRelatorioEnviado] = useState(false);
+  const [notificandoEquipe, setNotificandoEquipe] = useState(false);
+  const [equipeNotificada, setEquipeNotificada] = useState(false);
   const [escalas, setEscalas] = useState([]);
   
   // Lista padrão de fábrica
@@ -152,6 +154,36 @@ export default function SelecionarSetorEscala() {
 
   const totalEscaladosGeral = escalas.length;
 
+  const handleNotificarEquipe = async () => {
+    if (totalEscaladosGeral === 0) {
+      alert("Nenhum membro escalado nesta operação.");
+      return;
+    }
+    const confirma = window.confirm(`Deseja disparar aviso de convocação por e-mail para todos os ${totalEscaladosGeral} membros escalados nesta operação?`);
+    if (!confirma) return;
+
+    setNotificandoEquipe(true);
+    try {
+      const res = await fetch("/api/notificar-equipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventoId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setEquipeNotificada(true);
+        alert(`✅ ${data.message}`);
+      } else {
+        alert("Aviso: " + (data.message || data.error || "Não foi possível enviar as notificações."));
+      }
+    } catch (err) {
+      console.error("Erro ao notificar equipe:", err);
+      alert("Erro ao disparar avisos para a equipe.");
+    } finally {
+      setNotificandoEquipe(false);
+    }
+  };
+
   const handleGerarRelatorioCamisas = async () => {
     setGerandoRelatorio(true);
     try {
@@ -163,13 +195,13 @@ export default function SelecionarSetorEscala() {
       const data = await res.json();
       if (res.ok && data.success) {
         setRelatorioEnviado(true);
-        alert("✅ Relatório de camisas gerado e enviado por e-mail com sucesso para os gestores!");
+        alert(`✅ ${data.message || "Relatório de uniformes enviado para admin e coordenadores/produtores escalados!"}`);
       } else {
-        alert("Aviso: " + (data.message || data.error || "Não foi possível gerar o relatório de camisas."));
+        alert("Aviso: " + (data.message || data.error || "Não foi possível gerar o relatório de vestuário."));
       }
     } catch (err) {
-      console.error("Erro ao gerar relatório de camisas:", err);
-      alert("Erro ao enviar relatório de camisas.");
+      console.error("Erro ao gerar relatório de vestuário:", err);
+      alert("Erro ao enviar relatório de vestuário.");
     } finally {
       setGerandoRelatorio(false);
     }
@@ -274,24 +306,45 @@ export default function SelecionarSetorEscala() {
             </button>
 
             {totalEscaladosGeral > 0 && (
-              <button
-                type="button"
-                onClick={handleGerarRelatorioCamisas}
-                disabled={gerandoRelatorio}
-                className="w-full bg-[#1e293b] hover:bg-[#27384f] border border-[#3b82f6]/40 text-[#60a5fa] font-bold py-3.5 rounded-sm transition-colors cursor-pointer text-[15px] flex items-center justify-center gap-2 shadow-sm"
-              >
-                {gerandoRelatorio ? (
-                  <>
-                    <Loader2 className="animate-spin" size={18} />
-                    <span>Gerando relatório...</span>
-                  </>
-                ) : (
-                  <>
-                    <Shirt size={18} />
-                    <span>{relatorioEnviado ? "Reenviar relatório de camisas" : "Gerar relatório de camisas"}</span>
-                  </>
-                )}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleNotificarEquipe}
+                  disabled={notificandoEquipe}
+                  className="w-full bg-[#1e293b] hover:bg-[#28374d] border border-[#2563eb]/40 text-[#93c5fd] font-bold py-3.5 rounded-sm transition-colors cursor-pointer text-[15px] flex items-center justify-center gap-2 shadow-sm"
+                >
+                  {notificandoEquipe ? (
+                    <>
+                      <Loader2 className="animate-spin" size={18} />
+                      <span>Enviando convocações...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Send size={18} />
+                      <span>{equipeNotificada ? "Reenviar aviso à equipe escalada" : "Notificar equipe escalada por e-mail"}</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleGerarRelatorioCamisas}
+                  disabled={gerandoRelatorio}
+                  className="w-full bg-[#1e293b] hover:bg-[#27384f] border border-[#10b981]/40 text-[#6ee7b7] font-bold py-3.5 rounded-sm transition-colors cursor-pointer text-[15px] flex items-center justify-center gap-2 shadow-sm"
+                >
+                  {gerandoRelatorio ? (
+                    <>
+                      <Loader2 className="animate-spin" size={18} />
+                      <span>Enviando relatório...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Shirt size={18} />
+                      <span>{relatorioEnviado ? "Reenviar relatório de vestuário" : "Enviar relatório de vestuário aos coordenadores"}</span>
+                    </>
+                  )}
+                </button>
+              </>
             )}
 
             {totalEscaladosGeral > 0 ? (

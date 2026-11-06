@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { supabase } from "@/lib/supabase";
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
@@ -19,6 +19,7 @@ function AlocarEquipeConteudo() {
   const [equipe, setEquipe] = useState([]);
   const [busca, setBusca] = useState("");
   const [evento, setEvento] = useState(null);
+  const [notificarPorEmail, setNotificarPorEmail] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -122,36 +123,47 @@ function AlocarEquipeConteudo() {
             staff_id: staff.id,
             setor: setorNome
           });
+        } else if (staff.estaEmOutroSetor) {
+          // Apenas atualiza o setor se ele já estava alocado antes
+          await supabase.from('escalas').update({ setor: setorNome }).eq('id', staff.escalaId);
+        }
 
-          // 2. Disparar o E-mail de Escalação para este NOVO staff
-          if (staff.email && dadosEventoAtual) {
+        // 2. Disparar o E-mail de Escalação para o staff selecionado
+        if (notificarPorEmail) {
+          if (dadosEventoAtual && (staff.email || staff.id)) {
             const res = await enviarEmailEscalacao(
-              staff.email,
+              staff.email ? staff.email.trim() : "",
               staff.nome,
               { 
                 titulo: dadosEventoAtual.titulo || "Operação da Wadjet", 
                 endereco_texto: dadosEventoAtual.endereco_texto || "Local a ser definido"
               },
-              setorNome
+              setorNome,
+              staff.id
             );
             
             if (res.success) {
               emailsEnviados++;
+            } else if (res.error === "E-mail do colaborador não encontrado.") {
+              staffsSemEmail++;
             } else {
-              console.error(`Erro ao enviar e-mail para ${staff.email}:`, res.error);
+              console.error(`Erro ao enviar e-mail para ${staff.email || staff.id}:`, res.error);
             }
           } else {
             staffsSemEmail++;
           }
-
-        } else if (staff.estaEmOutroSetor) {
-          // Apenas atualiza o setor se ele já estava alocado antes
-          await supabase.from('escalas').update({ setor: setorNome }).eq('id', staff.escalaId);
         }
       }
 
       // Dá o feedback claro para o usuário sobre os envios
-      alert(`Setor salvo com sucesso!\n\n📧 E-mails de notificação enviados: ${emailsEnviados}\n⚠️ Staffs novos sem e-mail cadastrado: ${staffsSemEmail}`);
+      let msg = "Setor salvo com sucesso!";
+      if (notificarPorEmail) {
+        msg += `\n\n📧 E-mails de notificação enviados: ${emailsEnviados}`;
+        if (staffsSemEmail > 0) {
+          msg += `\n⚠️ Membros sem e-mail cadastrado: ${staffsSemEmail}`;
+        }
+      }
+      alert(msg);
       
       router.push(`/admin/eventos/${eventoId}/escalar`);
     } catch (error) {
@@ -231,8 +243,17 @@ function AlocarEquipeConteudo() {
           </div>
         </div>
 
-        <div className="p-5 border-t border-[#333333] bg-[#1a1a1a] fixed bottom-0 w-full max-w-[500px] z-20">
-          <button onClick={handleSalvarEscala} disabled={salvando} className="w-full bg-[#16a34a] hover:bg-[#15803d] text-white font-bold py-4 rounded-sm flex justify-center items-center gap-2 disabled:opacity-50 transition-colors shadow-sm cursor-pointer text-[16px]">
+        <div className="p-4 border-t border-[#333333] bg-[#1a1a1a] fixed bottom-0 w-full max-w-[500px] z-20 space-y-2.5">
+          <label className="flex items-center gap-2 cursor-pointer text-[#ccc] text-[13px] select-none">
+            <input
+              type="checkbox"
+              checked={notificarPorEmail}
+              onChange={(e) => setNotificarPorEmail(e.target.checked)}
+              className="w-4 h-4 rounded text-blue-600 accent-blue-600 cursor-pointer"
+            />
+            <span>Enviar aviso de convocação por e-mail aos selecionados</span>
+          </label>
+          <button onClick={handleSalvarEscala} disabled={salvando} className="w-full bg-[#16a34a] hover:bg-[#15803d] text-white font-bold py-3.5 rounded-sm flex justify-center items-center gap-2 disabled:opacity-50 transition-colors shadow-sm cursor-pointer text-[16px]">
             {salvando ? <Loader2 className="animate-spin" size={22} /> : <Save size={22} strokeWidth={2} />}
             {salvando ? "Salvando Equipe..." : "Confirmar Escala do Setor"}
           </button>

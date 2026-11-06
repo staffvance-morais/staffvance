@@ -17,7 +17,9 @@ import {
   Compass,
   CheckCircle2,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Shirt,
+  Send
 } from "lucide-react";
 
 export default function DetalhesEvento() {
@@ -32,6 +34,12 @@ export default function DetalhesEvento() {
   // Estados para exclusão
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [deletando, setDeletando] = useState(false);
+
+  // Estados para envio de e-mails operacionais
+  const [enviandoVestuario, setEnviandoVestuario] = useState(false);
+  const [vestuarioEnviado, setVestuarioEnviado] = useState(false);
+  const [notificandoEquipe, setNotificandoEquipe] = useState(false);
+  const [equipeNotificada, setEquipeNotificada] = useState(false);
 
   useEffect(() => {
     const fetchDetalhes = async () => {
@@ -65,6 +73,63 @@ export default function DetalhesEvento() {
       fetchDetalhes();
     }
   }, [eventoId]);
+
+  const handleEnviarRelatorioVestuario = async () => {
+    if (totalEscalados === 0) {
+      alert("Nenhum membro escalado para gerar relatório de vestuário.");
+      return;
+    }
+    setEnviandoVestuario(true);
+    try {
+      const res = await fetch("/api/resumo-camisas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventoId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setVestuarioEnviado(true);
+        alert(`✅ ${data.message || "Relatório de uniformes enviado para admin e coordenadores/produtores escalados!"}`);
+      } else {
+        alert("Aviso: " + (data.message || data.error || "Não foi possível enviar o relatório."));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao enviar relatório de vestuário.");
+    } finally {
+      setEnviandoVestuario(false);
+    }
+  };
+
+  const handleNotificarEquipe = async () => {
+    if (totalEscalados === 0) {
+      alert("Nenhum membro escalado nesta operação.");
+      return;
+    }
+    const confirma = window.confirm(`Deseja disparar aviso de convocação por e-mail para os ${totalEscalados} membros escalados nesta operação?`);
+    if (!confirma) return;
+
+    setNotificandoEquipe(true);
+    try {
+      const res = await fetch("/api/notificar-equipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventoId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setEquipeNotificada(true);
+        alert(`✅ ${data.message}`);
+      } else {
+        alert("Aviso: " + (data.message || data.error || "Não foi possível enviar as notificações."));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao disparar notificações para a equipe.");
+    } finally {
+      setNotificandoEquipe(false);
+    }
+  };
 
   const handleExcluirEvento = async () => {
     setDeletando(true);
@@ -331,6 +396,52 @@ export default function DetalhesEvento() {
               </div>
             </div>
 
+            {/* Relatório de Vestuário para Coordenadores */}
+            <div 
+              onClick={handleEnviarRelatorioVestuario}
+              className="bg-[#2a2a2a] border border-[#10b981]/40 hover:border-[#10b981] p-4 rounded-sm flex items-center justify-between cursor-pointer transition-colors group shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#10b981]/15 rounded-full flex items-center justify-center text-[#10b981]">
+                  {enviandoVestuario ? <Loader2 size={20} className="animate-spin" /> : <Shirt size={20} />}
+                </div>
+                <div>
+                  <h4 className="text-[#e5e5e5] font-semibold text-[15px] flex items-center gap-2">
+                    Relatório de Vestuário
+                    <span className="text-[10px] bg-[#10b981]/20 text-emerald-400 border border-[#10b981]/40 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">
+                      {vestuarioEnviado ? "Enviado" : "Coordenadores"}
+                    </span>
+                  </h4>
+                  <p className="text-[#999] text-[13px]">
+                    {enviandoVestuario ? "Disparando relatório..." : "Enviar resumo de tamanhos aos coordenadores da partida"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Notificar Equipe Escalada por E-mail */}
+            <div 
+              onClick={handleNotificarEquipe}
+              className="bg-[#2a2a2a] border border-[#2563eb]/40 hover:border-[#2563eb] p-4 rounded-sm flex items-center justify-between cursor-pointer transition-colors group shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#2563eb]/15 rounded-full flex items-center justify-center text-[#60a5fa]">
+                  {notificandoEquipe ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
+                </div>
+                <div>
+                  <h4 className="text-[#e5e5e5] font-semibold text-[15px] flex items-center gap-2">
+                    Notificar Equipe da Partida
+                    <span className="text-[10px] bg-[#2563eb]/20 text-blue-400 border border-[#2563eb]/40 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">
+                      {equipeNotificada ? "Avisos Enviados" : "E-mail Staff"}
+                    </span>
+                  </h4>
+                  <p className="text-[#999] text-[13px]">
+                    {notificandoEquipe ? "Enviando convocações..." : "Enviar aviso de convocação para todos os escalados"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Exportar Relatório / PDF */}
             <div 
               onClick={() => window.print()}
@@ -373,7 +484,7 @@ export default function DetalhesEvento() {
             </div>
 
             <p className="text-gray-300 text-sm leading-relaxed">
-              Deseja excluir a operação <strong className="text-white font-semibold">"{evento?.titulo}"</strong>? Todas as escalas e registros associados a este evento serão removidos.
+              Deseja excluir a operação <strong className="text-white font-semibold">&ldquo;{evento?.titulo}&rdquo;</strong>? Todas as escalas e registros associados a este evento serão removidos.
             </p>
 
             <div className="flex gap-2 pt-1">

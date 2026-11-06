@@ -38,20 +38,32 @@ export async function POST(request) {
       return NextResponse.json({ error: "Erro ao buscar escalas." }, { status: 500 });
     }
 
-    // 3. Busca e-mails de todos admins, coordenadores e owners (filtrando com trim/toLowerCase)
+    // 3. Identifica administradores e apenas os coordenadores/produtores que foram escalados na partida
     const { data: todosPerfis, error: gestoresError } = await supabaseAdmin
       .from("perfis")
-      .select("email, nome_completo, role");
+      .select("*");
 
     if (gestoresError) {
       console.error("Erro ao buscar gestores:", gestoresError);
       return NextResponse.json({ error: "Erro ao buscar gestores." }, { status: 500 });
     }
 
-    const rolesPermitidas = ["admin", "coordenador", "producao", "produção", "owner"];
-    const gestores = (todosPerfis || []).filter(g => {
-      const r = (g.role || "").toLowerCase().trim();
-      return rolesPermitidas.includes(r);
+    const idsEscalados = new Set((escalas || []).map(e => e.staff_id));
+    const rolesAdmin = ["admin", "owner", "administrador"];
+    const rolesCoordEProd = ["coordenador", "coordenadora", "producao", "produção", "produtor", "produtora"];
+
+    const destinatariosPerfis = (todosPerfis || []).filter(p => {
+      const r = (p.role || "").toLowerCase().trim();
+      const c = (p.cargo || "").toLowerCase().trim();
+
+      // Administradores sempre recebem
+      if (rolesAdmin.includes(r) || rolesAdmin.includes(c)) {
+        return true;
+      }
+
+      // Coordenadores e produtores recebem SOMENTE se estiverem escalados neste evento
+      const isCoordOuProd = rolesCoordEProd.includes(r) || rolesCoordEProd.includes(c);
+      return isCoordOuProd && idsEscalados.has(p.id);
     });
 
     // 4. Monta a lista de staff escalado
@@ -86,16 +98,36 @@ export async function POST(request) {
       Object.entries(contagem).filter(([, v]) => v > 0)
     );
 
-    // 6. Coleta e-mails validos dos gestores
-    const emailsDestinatarios = (gestores || [])
-      .filter(g => g.email && g.email.includes("@"))
-      .map(g => g.email);
+    // 6. Coleta e-mails válidos apenas dos administradores e dos coordenadores/produtores escalados
+    const emailsSet = new Set();
 
-    if (emailsDestinatarios.length === 0) {
-      return NextResponse.json({ success: false, message: "Nenhum gestor com e-mail cadastrado encontrado." });
+    for (const g of destinatariosPerfis) {
+      if (g.email && g.email.includes("@")) {
+        emailsSet.add(g.email.trim().toLowerCase());
+      } else if (g.id && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        try {
+          const { data: uData } = await supabaseAdmin.auth.admin.getUserById(g.id);
+          const authEmail = uData?.user?.email?.trim().toLowerCase();
+          if (authEmail && authEmail.includes("@")) {
+            emailsSet.add(authEmail);
+          }
+        } catch (_) {}
+      }
     }
 
-    // 7. Envia o e-mail
+    // Garante que os e-mails principais da administração recebam
+    if (process.env.EMAIL_USER && process.env.EMAIL_USER.includes("@")) {
+      emailsSet.add(process.env.EMAIL_USER.trim().toLowerCase());
+    }
+    emailsSet.add("wadjetseguranca@gmail.com");
+
+    const emailsDestinatarios = Array.from(emailsSet);
+
+    if (emailsDestinatarios.length === 0) {
+      return NextResponse.json({ success: false, message: "Nenhum e-mail de administrador, coordenador ou produtor escalado encontrado." });
+    }
+
+    // 7. Envia o relatório de vestuário
     const resultado = await enviarEmailResumoCamisas(
       emailsDestinatarios,
       evento,
@@ -107,13 +139,14 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: resultado.error }, { status: 500 });
     }
 
-    console.log(`[WADJET] Relatorio de uniformes enviado para ${emailsDestinatarios.length} gestores. Evento: ${evento.titulo}. Total staff: ${listaStaff.length}.`);
+    console.log(`[WADJET] Relatório de vestuário enviado para ${resultado.enviados} destinatário(s) (admin + coordenadores/produtores escalados). Evento: ${evento.titulo}. Staffs: ${listaStaff.length}.`);
 
     return NextResponse.json({
       success: true,
-      message: `Relatorio enviado para ${emailsDestinatarios.length} gestor(es).`,
+      message: `Relatório de uniformes enviado com sucesso para ${resultado.enviados} destinatário(s) (admin e coordenadores/produtores escalados).`,
       totalStaff: listaStaff.length,
       contagem: contagemFiltrada,
+      coordenadoresNotificados: emailsDestinatarios,
     });
 
   } catch (error) {
