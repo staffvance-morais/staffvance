@@ -98,8 +98,15 @@ export async function POST(request) {
       Object.entries(contagem).filter(([, v]) => v > 0)
     );
 
-    // 6. Coleta e-mails válidos apenas dos administradores e dos coordenadores/produtores escalados
+    // 6. Coleta e-mails válidos apenas dos 2 administradores (Morais e Admin conectado) e dos coordenadores/produtores escalados
     const emailsSet = new Set();
+
+    // Garante explicitamente os 2 administradores principais (principalmente o Morais)
+    emailsSet.add("alexmorais_silva@hotmail.com");
+    if (process.env.EMAIL_USER && process.env.EMAIL_USER.includes("@")) {
+      emailsSet.add(process.env.EMAIL_USER.trim().toLowerCase());
+    }
+    emailsSet.add("disnouaraujo@gmail.com");
 
     for (const g of destinatariosPerfis) {
       if (g.email && g.email.includes("@")) {
@@ -114,12 +121,6 @@ export async function POST(request) {
         } catch (_) {}
       }
     }
-
-    // Garante que os e-mails principais da administração recebam
-    if (process.env.EMAIL_USER && process.env.EMAIL_USER.includes("@")) {
-      emailsSet.add(process.env.EMAIL_USER.trim().toLowerCase());
-    }
-    emailsSet.add("wadjetseguranca@gmail.com");
 
     const emailsDestinatarios = Array.from(emailsSet);
 

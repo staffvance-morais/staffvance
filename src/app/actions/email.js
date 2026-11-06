@@ -1,9 +1,84 @@
 "use server";
 import { transporter } from "@/lib/nodemailer";
 import { createClient } from "@supabase/supabase-js";
+import crypto from "crypto";
 
-// URL base do seu sistema
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://gerenciador.wadjet.seg.br";
+const RESEND_FROM_ESCALA = "Equipe StaffVance <escala@wadjet.seg.br>";
+const RESEND_FROM_RELATORIO = "Equipe StaffVance <relatorios@wadjet.seg.br>";
+const RESEND_FROM_FINANCEIRO = "Equipe StaffVance <financeiro@wadjet.seg.br>";
+
+/**
+ * Dispara e-mail priorizando o domínio oficial verificado (@wadjet.seg.br via Resend / Amazon SES com DKIM e SPF)
+ * para garantir entrega direta na Caixa de Entrada Principal (Inbox), com fallback automático para Nodemailer.
+ */
+async function dispararEmailSeguro({ fromResend, to, subject, text, html }) {
+  const destinatariosArray = (Array.isArray(to) ? to : [to])
+    .map((e) => (typeof e === "string" ? e.trim().toLowerCase() : ""))
+    .filter((e) => e && e.includes("@"));
+
+  if (destinatariosArray.length === 0) {
+    throw new Error("Nenhum destinatário válido informado.");
+  }
+
+  const replyTo = (process.env.EMAIL_USER || "staffvance.morais@gmail.com").trim();
+  const refId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  // 1. Prioriza envio autenticado pelo domínio oficial verificado wadjet.seg.br (Resend / Amazon SES)
+  if (process.env.RESEND_API_KEY) {
+    for (let tentativa = 1; tentativa <= 3; tentativa++) {
+      try {
+        const response = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.RESEND_API_KEY.trim()}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: fromResend || RESEND_FROM_ESCALA,
+            to: destinatariosArray,
+            reply_to: replyTo,
+            subject,
+            text,
+            html,
+            headers: {
+              "X-Entity-Ref-ID": refId,
+            },
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          return { success: true, provider: "resend", id: data?.id };
+        }
+
+        // Se atingiu rate-limit de requisições por segundo da Resend, aguarda e tenta novamente
+        if (response.status === 429 && tentativa < 3) {
+          await new Promise((r) => setTimeout(r, 650 * tentativa));
+          continue;
+        }
+
+        const errData = await response.json().catch(() => ({}));
+        console.warn("[WADJET] Aviso Resend, acionando fallback SMTP:", errData?.message || response.status);
+        break;
+      } catch (err) {
+        console.warn("[WADJET] Erro de rede Resend, acionando fallback SMTP:", err.message);
+        break;
+      }
+    }
+  }
+
+  // 2. Fallback via Gmail SMTP (Nodemailer)
+  await transporter.sendMail({
+    from: `"Equipe StaffVance" <${replyTo}>`,
+    to: destinatariosArray.join(", "),
+    replyTo,
+    subject,
+    text,
+    html,
+  });
+
+  return { success: true, provider: "smtp" };
+}
 
 /**
  * Resolve o e-mail do membro no servidor caso não esteja preenchido na tabela perfis,
@@ -51,7 +126,7 @@ async function resolverEmailDestinatario(destinatario, staffId) {
   return "";
 }
 
-// 1. TEMPLATE: AVISO DE ESCALAÇÃO (Otimizado para Caixa de Entrada Principal / Anti-Spam)
+// 1. TEMPLATE: AVISO DE ESCALAÇÃO (Domínio verificado @wadjet.seg.br + estrutura tabular limpa sem links externos)
 export async function enviarEmailEscalacao(destinatario, nomeStaff, dadosEvento, setor, staffId = null) {
   try {
     const emailFinal = await resolverEmailDestinatario(destinatario, staffId);
@@ -60,89 +135,80 @@ export async function enviarEmailEscalacao(destinatario, nomeStaff, dadosEvento,
     }
 
     const nomeExibicao = (nomeStaff || "Colaborador").trim();
-    const tituloEvento = (dadosEvento?.titulo || "Operação Wadjet").trim();
+    const tituloEvento = (dadosEvento?.titulo || "Operacao Wadjet").trim();
     const localEvento = (dadosEvento?.endereco_texto || "A definir").trim();
     const setorDesignado = (setor || "Geral").trim();
-    const dataEnvio = new Date().toLocaleDateString("pt-BR", {
+    const dataGerada = new Date().toLocaleDateString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
     });
 
     const textContent = [
-      `Olá, ${nomeExibicao},`,
-      "",
-      `Sua participação na operação "${tituloEvento}" foi confirmada pela coordenação.`,
-      "",
-      "Resumo da sua alocação:",
-      `Evento: ${tituloEvento}`,
-      `Setor de atuação: ${setorDesignado}`,
+      `CONFIRMACAO DE SETOR — ${tituloEvento}`,
       `Local: ${localEvento}`,
       "",
-      `Você pode consultar sua escala completa no painel em: ${SITE_URL}/freelancers`,
+      `Colaborador(a): ${nomeExibicao}`,
+      `Setor designado: ${setorDesignado}`,
       "",
-      "Em caso de dúvidas sobre horários ou orientações do setor, basta responder a este e-mail.",
+      `Detalhamento da Alocacao:`,
+      `- Nome: ${nomeExibicao}`,
+      `- Evento: ${tituloEvento}`,
+      `- Setor: ${setorDesignado}`,
+      `- Local: ${localEvento}`,
       "",
-      "Atenciosamente,",
-      "Equipe StaffVance - Coordenação Operacional",
+      `Comunicado gerado pelo sistema StaffVance em ${dataGerada}.`,
     ].join("\n");
 
     const htmlContent = `<!DOCTYPE html>
 <html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Escala de Operação - ${tituloEvento}</title>
-</head>
-<body style="margin: 0; padding: 20px 12px; background-color: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1f2937;">
-  <div style="max-width: 560px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 28px;">
-    <p style="margin: 0 0 4px 0; font-size: 12px; color: #6b7280; font-weight: 600;">StaffVance &middot; Coordenação de Equipes</p>
-    <h2 style="margin: 0 0 20px 0; color: #111827; font-size: 19px; font-weight: 700; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px;">
-      Alocação de Setor — ${tituloEvento}
+<head><meta charset="UTF-8"/></head>
+<body style="margin:0;padding:20px 12px;background-color:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2937;">
+  <div style="max-width:600px;margin:0 auto;border:1px solid #e5e7eb;border-radius:8px;padding:28px;">
+    <p style="margin:0 0 4px 0;color:#6b7280;font-size:12px;font-weight:600;">StaffVance &middot; Coordenação Operacional</p>
+    <h2 style="margin:0 0 18px 0;color:#111827;font-size:20px;font-weight:700;border-bottom:1px solid #e5e7eb;padding-bottom:12px;">
+      Confirmação de Setor — ${tituloEvento}
     </h2>
 
-    <p style="margin: 0 0 14px 0; font-size: 15px; line-height: 1.6; color: #1f2937;">
-      Olá, <strong>${nomeExibicao}</strong>,
-    </p>
-    <p style="margin: 0 0 18px 0; font-size: 15px; line-height: 1.6; color: #374151;">
-      Sua participação na operação foi registrada. Abaixo estão os dados do setor onde você ficará alocado(a):
-    </p>
-
-    <div style="background-color: #f9fafb; border: 1px solid #d1d5db; border-radius: 6px; padding: 16px 18px; margin-bottom: 20px;">
-      <p style="margin: 0 0 8px 0; font-size: 14px; color: #374151;">
-        <strong style="color: #111827;">Operação:</strong> ${tituloEvento}
-      </p>
-      <p style="margin: 0 0 8px 0; font-size: 14px; color: #374151;">
-        <strong style="color: #111827;">Setor designado:</strong> <span style="color: #1d4ed8; font-weight: 700;">${setorDesignado}</span>
-      </p>
-      <p style="margin: 0; font-size: 14px; color: #374151;">
-        <strong style="color: #111827;">Local:</strong> ${localEvento}
-      </p>
+    <div style="background-color:#f9fafb;border:1px solid #d1d5db;border-radius:6px;padding:16px 18px;margin-bottom:20px;">
+      <p style="margin:0 0 6px 0;font-size:14px;color:#374151;"><strong style="color:#111827;">Colaborador(a):</strong> ${nomeExibicao}</p>
+      <p style="margin:0 0 6px 0;font-size:14px;color:#374151;"><strong style="color:#111827;">Operação:</strong> ${tituloEvento}</p>
+      <p style="margin:0;font-size:14px;color:#374151;"><strong style="color:#111827;">Local:</strong> ${localEvento}</p>
     </div>
 
-    <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #4b5563;">
-      Para consultar os horários e registrar sua presença no dia do evento, acesse sua área no link:
-      <a href="${SITE_URL}/freelancers" style="color: #2563eb; font-weight: 600; text-decoration: underline;">${SITE_URL}/freelancers</a>
-    </p>
+    <h3 style="margin:20px 0 10px 0;color:#111827;font-size:15px;font-weight:700;">Dados da Alocação</h3>
+    <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;">
+      <thead>
+        <tr style="background-color:#f1f5f9;">
+          <th style="padding:10px 14px;text-align:left;color:#475569;font-size:12px;border-bottom:1px solid #e2e8f0;">Colaborador</th>
+          <th style="padding:10px 14px;text-align:left;color:#475569;font-size:12px;border-bottom:1px solid #e2e8f0;">Setor Designado</th>
+          <th style="padding:10px 14px;text-align:left;color:#475569;font-size:12px;border-bottom:1px solid #e2e8f0;">Local</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding:10px 14px;background-color:#ffffff;border-bottom:1px solid #e2e8f0;color:#1e293b;font-size:13px;font-weight:600;">${nomeExibicao}</td>
+          <td style="padding:10px 14px;background-color:#ffffff;border-bottom:1px solid #e2e8f0;color:#1d4ed8;font-size:13px;font-weight:700;">${setorDesignado}</td>
+          <td style="padding:10px 14px;background-color:#ffffff;border-bottom:1px solid #e2e8f0;color:#475569;font-size:13px;">${localEvento}</td>
+        </tr>
+      </tbody>
+    </table>
 
-    <p style="margin: 0 0 20px 0; font-size: 13px; line-height: 1.5; color: #6b7280;">
-      Caso tenha alguma dúvida sobre o horário de chegada ou ponto de encontro, responda diretamente a este e-mail.
-    </p>
-
-    <div style="border-top: 1px solid #e5e7eb; padding-top: 14px; font-size: 12px; color: #9ca3af;">
-      Enviado para ${emailFinal} em ${dataEnvio} &middot; Equipe StaffVance
+    <div style="margin-top:24px;border-top:1px solid #e5e7eb;padding-top:14px;font-size:12px;color:#9ca3af;">
+      Comunicado gerado pelo sistema StaffVance em ${dataGerada}. Em caso de dúvidas, responda a este e-mail.
     </div>
   </div>
 </body>
 </html>`;
 
-    await transporter.sendMail({
-      from: `"Equipe StaffVance" <${process.env.EMAIL_USER}>`,
-      to: emailFinal,
-      subject: `Escala de trabalho: ${tituloEvento} - Setor ${setorDesignado}`,
+    await dispararEmailSeguro({
+      fromResend: RESEND_FROM_ESCALA,
+      to: [emailFinal],
+      subject: `Confirmacao de setor: ${tituloEvento}`,
       text: textContent,
       html: htmlContent,
     });
+
     return { success: true };
   } catch (error) {
     console.error("Erro E-mail Escala:", error);
@@ -220,9 +286,9 @@ export async function enviarEmailPagamento(destinatario, nomeStaff, dadosEvento,
 </body>
 </html>`;
 
-    await transporter.sendMail({
-      from: `"Equipe StaffVance" <${process.env.EMAIL_USER}>`,
-      to: emailFinal,
+    await dispararEmailSeguro({
+      fromResend: RESEND_FROM_FINANCEIRO,
+      to: [emailFinal],
       subject: `Confirmacao de pagamento: ${tituloEvento}`,
       text: textContent,
       html: htmlContent,
@@ -233,6 +299,7 @@ export async function enviarEmailPagamento(destinatario, nomeStaff, dadosEvento,
     return { success: false, error: error.message };
   }
 }
+
 // 3. TEMPLATE: RELATORIO DE UNIFORMES DA ESCALA
 export async function enviarEmailResumoCamisas(destinatarios, dadosEvento, contagem, listaStaff) {
   try {
@@ -355,38 +422,20 @@ export async function enviarEmailResumoCamisas(destinatarios, dadosEvento, conta
       return { success: false, error: "Nenhum e-mail de destinatário válido informado." };
     }
 
-    let enviadosSucesso = 0;
-    const erros = [];
-
-    // Envio individual para garantir entrega limpa para cada coordenador/gestor
-    for (const emailDestino of listaUnica) {
-      try {
-        await transporter.sendMail({
-          from: `"Equipe StaffVance" <${process.env.EMAIL_USER}>`,
-          to: emailDestino,
-          subject: `Relatorio de uniformes: ${dadosEvento.titulo || "Operacao"}`,
-          text: textContent,
-          html: htmlContent,
-        });
-        enviadosSucesso++;
-      } catch (sendErr) {
-        console.error(`Erro ao enviar relatório de camisas para ${emailDestino}:`, sendErr.message);
-        erros.push({ email: emailDestino, error: sendErr.message });
-      }
-    }
-
-    if (enviadosSucesso === 0) {
-      return {
-        success: false,
-        error: erros[0]?.error || "Falha ao enviar e-mails de relatório de vestuário.",
-      };
-    }
+    // Envia em um único disparo com todos os destinatários autorizados no cabeçalho "to"
+    // (os 2 admins + coordenadores/produtores escalados) para que todos recebam juntos e apareçam no "para:"
+    await dispararEmailSeguro({
+      fromResend: RESEND_FROM_RELATORIO,
+      to: listaUnica,
+      subject: `Relatorio de uniformes: ${dadosEvento.titulo || "Operacao"}`,
+      text: textContent,
+      html: htmlContent,
+    });
 
     return {
       success: true,
-      enviados: enviadosSucesso,
+      enviados: listaUnica.length,
       total: listaUnica.length,
-      erros: erros.length > 0 ? erros : undefined,
     };
   } catch (error) {
     console.error("Erro E-mail Resumo Camisas:", error);
