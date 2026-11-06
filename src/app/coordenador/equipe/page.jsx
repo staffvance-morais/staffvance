@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import HeaderSuperior from "@/components/HeaderSuperior";
 import { Search, Info, Plus, Filter, ChevronUp, Menu, User, Trash2, X, ZoomIn, AlertTriangle } from "lucide-react";
+import { BadgeClassificacao } from "@/components/AvaliacaoEncerramentoModal";
 
 // Configuração do Supabase
 
@@ -215,13 +216,23 @@ export default function EquipeCoordenador() {
                   </div>
 
                   {/* Dados do Staff */}
-                  <div className="flex flex-col justify-center flex-1 min-w-0">
-                    <h3 className="text-white font-bold text-lg leading-tight truncate">
-                      {membro.nome_completo || "Nome não definido"}
-                    </h3>
+                  <div className="flex flex-col justify-center flex-1 min-w-0 pr-16">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-white font-bold text-lg leading-tight truncate">
+                        {membro.nome_completo || "Nome não definido"}
+                      </h3>
+                      {membro.classificacao && (
+                        <BadgeClassificacao classificacao={membro.classificacao} />
+                      )}
+                    </div>
                     <p className="text-gray-400 text-sm mt-1 capitalize">
                       {membro.cargo || (membro.role === 'producao' ? 'Produção' : membro.role) || "Cargo não definido"}
                     </p>
+                    {membro.anotacoes && (
+                      <p className="text-[11px] text-amber-300/80 mt-1 truncate" title={membro.anotacoes}>
+                        📝 {membro.anotacoes}
+                      </p>
+                    )}
                   </div>
 
                   {/* Botão Info */}

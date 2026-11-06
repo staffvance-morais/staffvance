@@ -38,12 +38,12 @@ export default function PerfilDetalhado() {
   useEffect(() => {
     const fetchPerfil = async () => {
       try {
-        // Verifica se o usuário atual logado é admin
+        // Verifica se o usuário atual logado é admin, coordenador ou produtor
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           const { data: userPerfil } = await supabase.from('perfis').select('role').eq('id', user.id).single();
           const roleNorm = (userPerfil?.role || "").toLowerCase().trim();
-          if (roleNorm === 'admin' || roleNorm === 'owner') {
+          if (['admin', 'owner', 'coordenador', 'producao', 'produção'].includes(roleNorm)) {
             setIsAdmin(true);
           }
         }
@@ -212,8 +212,9 @@ export default function PerfilDetalhado() {
             </div>
           </div>
 
+          {isAdmin && (
           <div className="mt-8">
-            <p className="text-[#777] text-[12px] font-bold uppercase tracking-wider mb-4 flex items-center gap-2"><Award size={14}/> Gestão Interna (Morais)</p>
+            <p className="text-[#777] text-[12px] font-bold uppercase tracking-wider mb-4 flex items-center gap-2"><Award size={14}/> Gestão Interna (Admin, Coordenadores e Produtores)</p>
             
             {/* Cargo/Papel no Sistema (Exclusivo Admin) */}
             <div className="bg-[#222] border border-[#333] rounded-md p-5 mb-4">
@@ -303,6 +304,7 @@ export default function PerfilDetalhado() {
               )}
             </div>
           </div>
+          )}
 
         </div>
       </div>

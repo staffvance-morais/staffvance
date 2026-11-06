@@ -45,6 +45,7 @@ import {
   UserX
 } from "lucide-react";
 import { enviarEmailPagamento } from "@/app/actions/email";
+import RelatorioEventoHub from "@/components/RelatorioEventoHub";
 
 // ==========================================
 // FORMATAÇÕES & CONSTANTES
@@ -207,7 +208,7 @@ export default function AcertoFinanceiro() {
           .select(`
             id, setor, valor_pago, status_pagamento, 
             status_presenca, checkin_em, checkin_foto_url, checkin_lat, checkin_lng, checkout_em, checkin_manual,
-            perfis ( id, nome_completo, foto_url, email, chave_pix, uniforme )
+            perfis ( id, nome_completo, foto_url, email, chave_pix, uniforme, classificacao, anotacoes, role, cargo, cpf, whatsapp )
           `)
           .eq("evento_id", eventoId);
 
@@ -727,6 +728,19 @@ export default function AcertoFinanceiro() {
         {/* CONTEÚDO PRINCIPAL */}
         <div className="p-4 md:p-6 space-y-6 flex-1">
           
+          {/* CENTRAL DE EXPORTAÇÃO, DOWNLOAD EM PDF E COMPARTILHAMENTO DO RELATÓRIO */}
+          <div className="print:hidden">
+            <RelatorioEventoHub
+              evento={{
+                ...evento,
+                receita_bruta: parseFloat(receitaBruta) || 0,
+                despesas: mesclarTributosNaListaDespesas(despesas),
+              }}
+              escalas={equipe}
+              userRole="admin"
+            />
+          </div>
+
           {/* ==========================================
               BLOCO 1: BALANÇO EXECUTIVO DO EVENTO
              ========================================== */}

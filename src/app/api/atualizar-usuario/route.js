@@ -73,14 +73,35 @@ export async function PUT(request) {
       return NextResponse.json(
         {
           error:
-            "Acesso negado. Apenas administradores podem atualizar o perfil/cargo de funcionários.",
+            "Acesso negado. Apenas administradores, coordenadores e produtores podem atualizar classificações e anotações.",
         },
         { status: 403 }
       );
     }
 
-    // ─── 2. VALIDAR O PAYLOAD ──────────────────────────────────────
-    const { userId, role, cargo, classificacao, anotacoes } = await request.json();
+    // ─── 2. VALIDAR O PAYLOAD (INDIVIDUAL OU EM LOTE NO ENCERRAMENTO) ───
+    const body = await request.json();
+
+    if (Array.isArray(body.avaliacoes)) {
+      const resultados = [];
+      for (const item of body.avaliacoes) {
+        if (!item?.userId) continue;
+        const campos = {};
+        if (item.classificacao !== undefined) campos.classificacao = item.classificacao;
+        if (item.anotacoes !== undefined) campos.anotacoes = item.anotacoes;
+
+        if (Object.keys(campos).length > 0) {
+          const { error: errItem } = await supabaseAdmin
+            .from("perfis")
+            .update(campos)
+            .eq("id", item.userId);
+          resultados.push({ userId: item.userId, ok: !errItem, error: errItem?.message });
+        }
+      }
+      return NextResponse.json({ success: true, resultados });
+    }
+
+    const { userId, role, cargo, classificacao, anotacoes } = body;
 
     if (!userId) {
       return NextResponse.json({ error: "userId é obrigatório." }, { status: 400 });

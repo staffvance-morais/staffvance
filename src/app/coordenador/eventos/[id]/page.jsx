@@ -1,265 +1,465 @@
-﻿"use client";
+"use client";
 import { supabase } from "@/lib/supabase";
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useCallback } from "react";
+import { useRouter, useParams } from "next/navigation";
 import { 
-  CalendarDays, 
-  Search, 
+  ArrowLeft, 
+  Edit3, 
   Calendar, 
-  Handshake, 
-  ClipboardList, 
-  Info, // <-- Voltamos para o ícone de Informação (i)
-  Check, 
-  Filter, 
-  ChevronUp, 
-  Menu,
-  Loader2 
+  MapPin, 
+  Briefcase, 
+  Users, 
+  Clock,
+  Loader2,
+  Image as ImageIcon,
+  Compass,
+  CheckCircle2,
+  Shirt,
+  Send,
+  Award,
+  History
 } from "lucide-react";
+import AvaliacaoEncerramentoModal, { isGestorAutorizado } from "@/components/AvaliacaoEncerramentoModal";
+import RelatorioEventoHub from "@/components/RelatorioEventoHub";
 
-// Conexão com o Supabase
+export default function DetalhesEventoCoordenador() {
+  const router = useRouter();
+  const params = useParams();
+  const eventoId = params.id;
 
-// ==========================================
-// COMPONENTE: CARD DO EVENTO (DINÂMICO)
-// ==========================================
-const EventCard = ({ id, image, title, location, date, time, client, staffCount, isLive, selected, router }) => {
-  return (
-    <div className="border border-[#3a3a3a] bg-[#222222] flex flex-col mb-4 rounded-sm overflow-hidden shrink-0">
-      {/* Imagem do Evento */}
-      <div className="h-[100px] w-full relative border-b border-[#3a3a3a] bg-[#1a1a1a]">
-        {image ? (
-          <img src={image} className="object-cover w-full h-full" alt={title} />
-        ) : (
-          <div className="flex items-center justify-center h-full text-[#666] text-xs">Sem Imagem</div>
-        )}
-      </div>
-      
-      {/* Detalhes do Evento */}
-      <div className="p-4 relative">
-        <div className="flex justify-between items-start mb-3">
-          <div>
-            <h3 className="text-[#e5e5e5] text-[20px] font-semibold leading-tight tracking-wide">{title}</h3>
-            <p className="text-[#999999] text-[15px] mt-0.5">{location || "Local não informado"}</p>
-          </div>
-          
-          {/* Checkbox Customizado */}
-          <div className={`w-[22px] h-[22px] rounded-[2px] flex items-center justify-center mt-1 border ${selected ? 'bg-[#2563eb] border-[#2563eb]' : 'bg-[#1a1a1a] border-[#444]'}`}>
-            {selected && <Check size={16} className="text-white" strokeWidth={3.5} />}
-          </div>
-        </div>
-
-        <div className="flex justify-between items-end">
-          {/* Informações em Lista */}
-          <div className="space-y-2.5">
-            <div className="flex items-center text-[#999999] text-[14.5px] gap-3">
-              <Calendar size={18} className="text-[#777]" /> 
-              <span>{date || "Data a definir"}, <strong className="text-[#bbb] font-medium">{time || ""}</strong></span>
-            </div>
-            <div className="flex items-center text-[#999999] text-[14.5px] gap-3">
-              <Handshake size={18} className="text-[#777]" /> 
-              <span>{client || "Cliente não informado"}</span>
-            </div>
-            <div className="flex items-center text-[#22c55e] font-medium text-[14.5px] gap-3">
-              <ClipboardList size={18} className="text-[#22c55e]" /> 
-              <span>{staffCount}</span>
-            </div>
-          </div>
-
-          {/* Status e Botão Info */}
-          <div className="flex flex-col items-end justify-between h-[84px]">
-            {isLive ? (
-              <div className="flex items-center gap-1.5 text-[#e5e5e5] text-[13px] font-bold tracking-widest uppercase">
-                <div className="w-2.5 h-2.5 bg-[#22c55e] rounded-sm"></div> 
-                AO VIVO
-              </div>
-            ) : (
-              <div></div>
-            )}
-            
-            {/* ==================================================
-                BOTÃO DE INFO (Leva para a página de Detalhes)
-                ================================================== */}
-            <button 
-              onClick={() => router.push(`/admin/eventos/${id}`)}
-              title="Ver Detalhes do Evento"
-              className="w-11 h-11 border border-[#444] rounded-sm bg-[#2a2a2a] flex items-center justify-center text-[#999] hover:bg-[#333] hover:text-[#2563eb] transition-colors cursor-pointer"
-            >
-              <Info size={26} strokeWidth={1.5} />
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ==========================================
-// PÁGINA PRINCIPAL: EVENTOS
-// ==========================================
-export default function PainelEventosMorais() {
-  const router = useRouter(); 
-  const [eventos, setEventos] = useState([]);
+  const [evento, setEvento] = useState(null);
+  const [escalas, setEscalas] = useState([]);
+  const [totalEscalados, setTotalEscalados] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [busca, setBusca] = useState("");
+  const [userRole, setUserRole] = useState("coordenador");
+
+  // Modal de Classificação e Anotações no Encerramento
+  const [modalAvaliacaoAberto, setModalAvaliacaoAberto] = useState(false);
+
+  // Estados para envio de e-mails operacionais
+  const [enviandoVestuario, setEnviandoVestuario] = useState(false);
+  const [vestuarioEnviado, setVestuarioEnviado] = useState(false);
+  const [notificandoEquipe, setNotificandoEquipe] = useState(false);
+  const [equipeNotificada, setEquipeNotificada] = useState(false);
+
+  const fetchDetalhes = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: perfilData } = await supabase
+          .from("perfis")
+          .select("role")
+          .eq("id", session.user.id)
+          .single();
+        if (perfilData?.role) {
+          setUserRole(perfilData.role.toLowerCase().trim());
+        }
+      }
+
+      const { data: dadosEvento, error: erroEvento } = await supabase
+        .from('eventos')
+        .select('*')
+        .eq('id', eventoId)
+        .single();
+
+      if (erroEvento) throw erroEvento;
+      setEvento(dadosEvento);
+
+      const { data: dadosEscalas, error: erroEscala } = await supabase
+        .from('escalas')
+        .select(`
+          id,
+          evento_id,
+          staff_id,
+          setor,
+          valor_pago,
+          status_pagamento,
+          status_presenca,
+          checkin_em,
+          checkout_em,
+          perfis (
+            id,
+            nome_completo,
+            cpf,
+            whatsapp,
+            chave_pix,
+            uniforme,
+            role,
+            cargo,
+            classificacao,
+            anotacoes,
+            foto_url
+          )
+        `)
+        .eq('evento_id', eventoId);
+
+      if (!erroEscala && dadosEscalas) {
+        setEscalas(dadosEscalas);
+        setTotalEscalados(dadosEscalas.length);
+      }
+
+    } catch (error) {
+      console.error("Erro ao carregar detalhes do evento:", error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [eventoId]);
 
   useEffect(() => {
-    const fetchEventos = async () => {
-      try {
-        const { data: evData, error: evError } = await supabase
-          .from('eventos')
-          .select('*')
-          .order('created_at', { ascending: false });
+    if (eventoId) {
+      fetchDetalhes();
+    }
+  }, [eventoId, fetchDetalhes]);
 
-        if (evError) throw evError;
+  const handleArquivarNoHistorico = async () => {
+    try {
+      const { error } = await supabase
+        .from("eventos")
+        .update({ escopo: "arquivado" })
+        .eq("id", eventoId);
+      if (error) throw error;
+      setEvento((prev) => (prev ? { ...prev, escopo: "arquivado" } : prev));
+      setModalAvaliacaoAberto(false);
+      alert("✅ Avaliações salvas e evento movido para a aba Histórico!");
+    } catch (err) {
+      console.error("Erro ao arquivar evento:", err);
+      alert("Erro ao enviar evento para o histórico.");
+    }
+  };
 
-        const { data: escData } = await supabase
-          .from('escalas')
-          .select('evento_id');
-
-        if (evData) {
-          const eventosFormatados = evData.map(ev => {
-            let dataFormatada = "";
-            let horaFormatada = "";
-            if (ev.data_inicio) {
-              const d = new Date(ev.data_inicio);
-              dataFormatada = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-              horaFormatada = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + " - " + 
-                (ev.data_fim ? new Date(ev.data_fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : "");
-            }
-
-            const count = escData ? escData.filter(esc => esc.evento_id === ev.id).length : 0;
-
-            return {
-              id: ev.id,
-              title: ev.titulo,
-              location: ev.endereco_texto,
-              client: ev.nome_contratante,
-              date: dataFormatada,
-              time: horaFormatada,
-              image: ev.foto_local,
-              staffCount: `${count} escalado(s)`, 
-              isLive: false,
-              selected: true
-            };
-          });
-
-          setEventos(eventosFormatados);
-        }
-      } catch (error) {
-        console.error("Erro ao buscar eventos:", error.message);
-      } finally {
-        setLoading(false);
+  const handleEnviarRelatorioVestuario = async () => {
+    if (totalEscalados === 0) {
+      alert("Nenhum membro escalado para gerar relatório de vestuário.");
+      return;
+    }
+    setEnviandoVestuario(true);
+    try {
+      const res = await fetch("/api/resumo-camisas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventoId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setVestuarioEnviado(true);
+        alert(`✅ ${data.message || "Relatório de uniformes enviado para admin e coordenadores/produtores escalados!"}`);
+      } else {
+        alert("Aviso: " + (data.message || data.error || "Não foi possível enviar o relatório."));
       }
-    };
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao enviar relatório de vestuário.");
+    } finally {
+      setEnviandoVestuario(false);
+    }
+  };
 
-    fetchEventos();
-  }, []);
+  const handleNotificarEquipe = async () => {
+    if (totalEscalados === 0) {
+      alert("Nenhum membro escalado nesta operação.");
+      return;
+    }
+    const confirma = window.confirm(`Deseja disparar aviso de convocação por e-mail para os ${totalEscalados} membros escalados nesta operação?`);
+    if (!confirma) return;
 
-  const eventosFiltrados = eventos.filter(ev => 
-    ev.title?.toLowerCase().includes(busca.toLowerCase()) ||
-    ev.location?.toLowerCase().includes(busca.toLowerCase())
-  );
+    setNotificandoEquipe(true);
+    try {
+      const res = await fetch("/api/notificar-equipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventoId }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setEquipeNotificada(true);
+        alert(`✅ ${data.message}`);
+      } else {
+        alert("Aviso: " + (data.message || data.error || "Não foi possível enviar as notificações."));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao disparar notificações para a equipe.");
+    } finally {
+      setNotificandoEquipe(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#171717] flex flex-col items-center justify-center text-[#777]">
+        <Loader2 className="animate-spin mb-4 text-[#2563eb]" size={40} />
+        <p>Carregando informações da operação...</p>
+      </div>
+    );
+  }
+
+  if (!evento) {
+    return (
+      <div className="min-h-screen bg-[#171717] flex flex-col items-center justify-center text-[#777]">
+        <p>Evento não encontrado.</p>
+        <button onClick={() => router.push('/coordenador/eventos')} className="mt-4 text-[#2563eb] hover:underline">Voltar para a lista</button>
+      </div>
+    );
+  }
+
+  let dataFormatada = "Data a definir";
+  let horaFormatada = "Hora a definir";
+  
+  if (evento.data_inicio) {
+    const dInicio = new Date(evento.data_inicio);
+    dataFormatada = dInicio.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    horaFormatada = dInicio.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    
+    if (evento.data_fim) {
+      const dFim = new Date(evento.data_fim);
+      horaFormatada += " às " + dFim.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    }
+  }
+
+  const possuiMapaTatico = 
+    evento.mapa_tatico === true || 
+    (evento.endereco_texto && evento.endereco_texto.toLowerCase().includes("presidente vargas"));
+
+  const podeVerAvaliacoes = isGestorAutorizado(userRole);
 
   return (
-    <div className="min-h-screen bg-[#171717] font-sans flex flex-col items-center justify-center">
-      
-      <div className="w-full max-w-[400px] h-[100dvh] flex flex-col p-4 bg-[#171717] relative">
+    <div className="min-h-screen bg-[#171717] font-sans flex flex-col items-center">
+      <div className="w-full max-w-[540px] min-h-screen flex flex-col bg-[#1c1c1c] relative border-x border-[#2a2a2a]">
         
         {/* CABEÇALHO */}
-        <div className="flex items-center gap-3 text-[#cccccc] pb-3 border-b border-[#333333]">
-          <CalendarDays size={20} strokeWidth={1.5} />
-          <h1 className="text-[17px] tracking-wide">Eventos</h1>
-        </div>
-
-        {/* BARRA DE PESQUISA */}
-        <div className="mt-4 relative shrink-0">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#777]" size={22} strokeWidth={1.5} />
-          <input 
-            type="text" 
-            placeholder="Toque para pesquisar" 
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            className="w-full bg-[#2a2a2a] border border-[#3a3a3a] text-[#e5e5e5] py-3.5 pl-[46px] pr-4 outline-none text-[17px] rounded-sm placeholder:text-[#777] focus:border-[#555] transition-colors" 
-          />
-        </div>
-
-        {/* CONTAGEM DE LISTA */}
-        <div className="mt-4 mb-3 text-[14px] text-[#999999] tracking-wide shrink-0">
-          Listando <span className="text-[#e5e5e5] font-semibold">{eventosFiltrados.length}</span> eventos
-        </div>
-
-        {/* ÁREA DE ROLAGEM DOS CARDS */}
-        <div className="flex-1 overflow-y-auto pb-4 custom-scrollbar">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-20 text-[#777]">
-              <Loader2 className="animate-spin mb-2" size={28} />
-              <p className="text-sm">Carregando eventos do banco...</p>
-            </div>
-          ) : eventosFiltrados.length === 0 ? (
-            <div className="text-center py-20 text-[#777] bg-[#222] rounded-sm border border-[#333]">
-              <p className="font-semibold text-[#e5e5e5] mb-1">Nenhum evento encontrado.</p>
-              <p className="text-[13px]">Cadastre o primeiro evento usando o botão abaixo.</p>
-            </div>
-          ) : (
-            eventosFiltrados.map((ev) => (
-              <EventCard 
-                key={ev.id}
-                id={ev.id}
-                image={ev.image}
-                title={ev.title}
-                location={ev.location}
-                date={ev.date}
-                time={ev.time}
-                client={ev.client}
-                staffCount={ev.staffCount}
-                isLive={ev.isLive}
-                selected={ev.selected}
-                router={router} 
-              />
-            ))
-          )}
-        </div>
-
-        {/* ÁREA INFERIOR FIXA */}
-        <div className="shrink-0 pt-2 flex flex-col gap-3 bg-[#171717]">
-          
-          <Link 
-            href="/admin/eventos/cadastrar"
-            className="w-full bg-[#2563eb] hover:bg-[#1d4ed8] text-white flex items-center justify-center font-semibold py-4 text-[18px] tracking-wide rounded-sm transition-colors shadow-sm cursor-pointer"
-          >
-            Cadastrar evento
-          </Link>
-
-          <button className="w-full bg-[#2a2a2a] border border-[#3a3a3a] hover:bg-[#333] text-[#a3a3a3] py-[14px] flex items-center justify-between px-4 rounded-sm transition-colors cursor-pointer">
-            <div className="flex items-center gap-3 text-[17px] tracking-wide">
-              <Filter size={22} strokeWidth={1.5} /> Mais opções...
-            </div>
-            <div className="p-0.5 border border-[#4a4a4a] rounded-sm bg-[#222]">
-              <ChevronUp size={20} strokeWidth={1.5} className="text-[#999]" />
-            </div>
-          </button>
-
-          <div className="flex items-stretch justify-between border border-[#3a3a3a] bg-[#1a1a1a] rounded-sm overflow-hidden h-[60px]">
-            <div className="w-16 flex items-center justify-center opacity-30">
-              <img 
-                src="/icon.png" 
-                alt="Wadjet Logo" 
-                className="w-8 h-8 object-contain grayscale" 
-                onError={(e) => { e.target.style.display = "none"; }}
-              />
-            </div>
-            
+        <div className="flex items-center justify-between p-5 border-b border-[#333333] sticky top-0 bg-[#1c1c1c] z-10 shadow-sm">
+          <div className="flex items-center gap-4 text-[#cccccc]">
             <button 
-              onClick={() => router.push('/admin')} 
-              className="w-[60px] border-l border-[#3a3a3a] flex items-center justify-center text-[#777] bg-[#222] hover:bg-[#2a2a2a] transition-colors cursor-pointer"
+              onClick={() => router.push('/coordenador/eventos')} 
+              className="w-10 h-10 flex items-center justify-center rounded-sm hover:bg-[#2a2a2a] transition-colors cursor-pointer"
             >
-              <Menu size={32} strokeWidth={1.5} />
+              <ArrowLeft size={24} strokeWidth={1.5} />
             </button>
+            <h1 className="text-[18px] font-semibold tracking-wide text-[#e5e5e5]">Detalhes da Operação</h1>
           </div>
+          
+          <button 
+            onClick={() => router.push(`/coordenador/eventos/${eventoId}/editar`)}
+            className="flex items-center gap-2 text-[#2563eb] hover:text-[#1d4ed8] font-bold text-[14px] bg-[#2563eb]/10 px-3 py-2 rounded-sm transition-colors cursor-pointer"
+          >
+            <Edit3 size={18} strokeWidth={2} />
+            EDITAR
+          </button>
+        </div>
 
+        {/* IMAGEM DO EVENTO */}
+        <div className="w-full h-[200px] bg-[#111] relative border-b border-[#333]">
+          {evento.foto_local ? (
+            <img src={evento.foto_local} alt={evento.titulo} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center text-[#555]">
+              <ImageIcon size={40} className="mb-2" />
+              <span className="text-[14px]">Sem imagem do local</span>
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#1c1c1c] to-transparent"></div>
+        </div>
+
+        {/* INFORMAÇÕES PRINCIPAIS */}
+        <div className="p-6 -mt-10 relative z-0">
+          <div className="bg-[#222] border border-[#3a3a3a] rounded-md p-5 shadow-lg">
+            <div className="flex items-start justify-between gap-2">
+              <h2 className="text-[#e5e5e5] text-[22px] font-bold leading-tight uppercase tracking-wide mb-1">
+                {evento.titulo}
+              </h2>
+              {evento.escopo === "arquivado" && (
+                <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 text-[10px] font-bold uppercase flex items-center gap-1 shrink-0">
+                  <History size={11} /> No Histórico
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-[#2563eb] text-[14px] font-semibold uppercase mb-5">
+              <Briefcase size={16} />
+              {evento.nome_contratante || "Contratante não informado"}
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 text-[#ccc]">
+                <Calendar className="text-[#777] mt-0.5 shrink-0" size={20} />
+                <div>
+                  <p className="text-[13px] text-[#777] uppercase tracking-wider font-semibold">Data da Operação</p>
+                  <p className="text-[16px] font-medium">{dataFormatada}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 text-[#ccc]">
+                <Clock className="text-[#777] mt-0.5 shrink-0" size={20} />
+                <div>
+                  <p className="text-[13px] text-[#777] uppercase tracking-wider font-semibold">Horário</p>
+                  <p className="text-[16px] font-medium">{horaFormatada}</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 text-[#ccc]">
+                <MapPin className="text-[#777] mt-0.5 shrink-0" size={20} />
+                <div>
+                  <p className="text-[13px] text-[#777] uppercase tracking-wider font-semibold">Local (Endereço)</p>
+                  <p className="text-[16px] font-medium">{evento.endereco_texto || "Não informado"}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* PAINEL DE CONTROLE */}
+        <div className="px-6 pb-8 flex-1">
+          <h3 className="text-[#999] text-[13px] uppercase tracking-widest font-bold mb-3">Painel de Controle</h3>
+          
+          <div className="flex flex-col gap-3">
+            
+            {possuiMapaTatico && (
+              <div 
+                onClick={() => router.push(`/mapa?evento=${eventoId}`)}
+                className="bg-[#2a2a2a] border border-[#16a34a]/40 hover:border-[#16a34a] p-4 rounded-sm flex items-center justify-between cursor-pointer transition-colors group shadow-md"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-[#16a34a]/10 rounded-full flex items-center justify-center text-[#16a34a]">
+                    <Compass size={22} />
+                  </div>
+                  <div>
+                    <h4 className="text-[#e5e5e5] font-bold text-[15px] flex items-center gap-2">
+                      Painel Tático Operacional
+                      <span className="text-[10px] bg-[#16a34a] text-white px-1.5 py-0.5 rounded-sm uppercase tracking-wider">Ativo</span>
+                    </h4>
+                    <p className="text-[#999] text-[13px]">Visualizar mapa e setores do Estádio</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Controle de Presença */}
+            <div 
+              onClick={() => router.push(`/coordenador/eventos/${eventoId}/presenca`)}
+              className="bg-[#2a2a2a] border border-[#3a3a3a] hover:border-[#16a34a] p-4 rounded-sm flex items-center justify-between cursor-pointer transition-colors group shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#16a34a]/10 rounded-full flex items-center justify-center text-[#16a34a]">
+                  <CheckCircle2 size={20} />
+                </div>
+                <div>
+                  <h4 className="text-[#e5e5e5] font-semibold text-[15px] flex items-center gap-2">
+                    Controle de Presença
+                    <span className="text-[10px] bg-[#16a34a]/20 text-emerald-400 border border-[#16a34a]/40 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">Ao Vivo</span>
+                  </h4>
+                  <p className="text-[#999] text-[13px]">Lista de chamada em tempo real e selfies</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Gerenciar Escala */}
+            <div 
+              onClick={() => router.push(`/coordenador/eventos/${eventoId}/escalar`)}
+              className="bg-[#2a2a2a] border border-[#3a3a3a] hover:border-[#22c55e] p-4 rounded-sm flex items-center justify-between cursor-pointer transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#22c55e]/10 rounded-full flex items-center justify-center text-[#22c55e]">
+                  <Users size={20} />
+                </div>
+                <div>
+                  <h4 className="text-[#e5e5e5] font-semibold text-[15px]">Gerenciar Escala</h4>
+                  <p className="text-[#999] text-[13px]">{totalEscalados} segurança(s) escalado(s)</p>
+                </div>
+              </div>
+            </div>
+
+            {/* ENCERRAMENTO DO EVENTO: CLASSIFICAÇÃO (OURO, PRATA, BRONZE) E ANOTAÇÕES — VISÍVEL APENAS PARA ADMIN, COORDENADORES E PRODUTORES */}
+            {podeVerAvaliacoes && (
+              <div 
+                onClick={() => setModalAvaliacaoAberto(true)}
+                className="bg-[#2a2a2a] border border-yellow-500/40 hover:border-yellow-400 p-4 rounded-sm flex items-center justify-between cursor-pointer transition-colors group shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-yellow-500/15 rounded-full flex items-center justify-center text-yellow-400 shrink-0">
+                    <Award size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-[#e5e5e5] font-semibold text-[15px] flex items-center gap-2 flex-wrap">
+                      Classificar Staff & Anotações (Encerramento)
+                      <span className="text-[10px] bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">
+                        Ouro • Prata • Bronze
+                      </span>
+                    </h4>
+                    <p className="text-[#999] text-[13px]">
+                      Avaliar equipe escalada e registrar anotações confidenciais do evento
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Relatório de Vestuário */}
+            <div 
+              onClick={handleEnviarRelatorioVestuario}
+              className="bg-[#2a2a2a] border border-[#10b981]/40 hover:border-[#10b981] p-4 rounded-sm flex items-center justify-between cursor-pointer transition-colors group shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#10b981]/15 rounded-full flex items-center justify-center text-[#10b981]">
+                  {enviandoVestuario ? <Loader2 size={20} className="animate-spin" /> : <Shirt size={20} />}
+                </div>
+                <div>
+                  <h4 className="text-[#e5e5e5] font-semibold text-[15px] flex items-center gap-2">
+                    Relatório de Vestuário
+                    <span className="text-[10px] bg-[#10b981]/20 text-emerald-400 border border-[#10b981]/40 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">
+                      {vestuarioEnviado ? "Enviado" : "Admin & Escalados"}
+                    </span>
+                  </h4>
+                  <p className="text-[#999] text-[13px]">
+                    {enviandoVestuario ? "Disparando relatório..." : "Enviar resumo de tamanhos para admins e coordenadores/produtores escalados"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Notificar Equipe */}
+            <div 
+              onClick={handleNotificarEquipe}
+              className="bg-[#2a2a2a] border border-[#2563eb]/40 hover:border-[#2563eb] p-4 rounded-sm flex items-center justify-between cursor-pointer transition-colors group shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-[#2563eb]/15 rounded-full flex items-center justify-center text-[#60a5fa]">
+                  {notificandoEquipe ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
+                </div>
+                <div>
+                  <h4 className="text-[#e5e5e5] font-semibold text-[15px] flex items-center gap-2">
+                    Notificar Equipe da Partida
+                    <span className="text-[10px] bg-[#2563eb]/20 text-blue-400 border border-[#2563eb]/40 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">
+                      {equipeNotificada ? "Avisos Enviados" : "E-mail Staff"}
+                    </span>
+                  </h4>
+                  <p className="text-[#999] text-[13px]">
+                    {notificandoEquipe ? "Enviando convocações..." : "Enviar aviso de convocação para todos os escalados"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* CENTRAL ILUSTRATIVA DE EXPORTAR / BAIXAR PDF / COMPARTILHAR RELATÓRIO */}
+            <RelatorioEventoHub
+              evento={evento}
+              escalas={escalas}
+              userRole={userRole}
+            />
+            
+          </div>
         </div>
 
       </div>
+
+      {/* MODAL DE CLASSIFICAÇÃO E ANOTAÇÕES NO ENCERRAMENTO */}
+      <AvaliacaoEncerramentoModal
+        aberto={modalAvaliacaoAberto}
+        onClose={() => setModalAvaliacaoAberto(false)}
+        evento={evento}
+        escalas={escalas}
+        userRole={userRole}
+        onSaved={fetchDetalhes}
+        onArchiveEvent={handleArquivarNoHistorico}
+      />
     </div>
   );
 }

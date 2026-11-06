@@ -1,6 +1,6 @@
 "use client";
 import { supabase } from "@/lib/supabase";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { 
   ArrowLeft, 
@@ -13,14 +13,18 @@ import {
   Clock,
   Loader2,
   Image as ImageIcon,
-  Printer,
   Compass,
   CheckCircle2,
   Trash2,
   AlertTriangle,
   Shirt,
-  Send
+  Send,
+  Award,
+  History,
+  FileText
 } from "lucide-react";
+import AvaliacaoEncerramentoModal, { isGestorAutorizado, BadgeClassificacao } from "@/components/AvaliacaoEncerramentoModal";
+import RelatorioEventoHub from "@/components/RelatorioEventoHub";
 
 export default function DetalhesEvento() {
   const router = useRouter();
@@ -28,8 +32,13 @@ export default function DetalhesEvento() {
   const eventoId = params.id;
 
   const [evento, setEvento] = useState(null);
+  const [escalas, setEscalas] = useState([]);
   const [totalEscalados, setTotalEscalados] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState("");
+
+  // Modal de Classificação e Anotações no Encerramento
+  const [modalAvaliacaoAberto, setModalAvaliacaoAberto] = useState(false);
 
   // Estados para exclusão
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
@@ -41,38 +50,90 @@ export default function DetalhesEvento() {
   const [notificandoEquipe, setNotificandoEquipe] = useState(false);
   const [equipeNotificada, setEquipeNotificada] = useState(false);
 
-  useEffect(() => {
-    const fetchDetalhes = async () => {
-      try {
-        const { data: dadosEvento, error: erroEvento } = await supabase
-          .from('eventos')
-          .select('*')
-          .eq('id', eventoId)
+  const fetchDetalhes = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: perfilData } = await supabase
+          .from("perfis")
+          .select("role")
+          .eq("id", session.user.id)
           .single();
-
-        if (erroEvento) throw erroEvento;
-        setEvento(dadosEvento);
-
-        const { count, error: erroEscala } = await supabase
-          .from('escalas')
-          .select('*', { count: 'exact', head: true })
-          .eq('evento_id', eventoId);
-
-        if (!erroEscala && count !== null) {
-          setTotalEscalados(count);
+        if (perfilData?.role) {
+          setUserRole(perfilData.role.toLowerCase().trim());
         }
-
-      } catch (error) {
-        console.error("Erro ao carregar detalhes do evento:", error.message);
-      } finally {
-        setLoading(false);
       }
-    };
 
+      const { data: dadosEvento, error: erroEvento } = await supabase
+        .from('eventos')
+        .select('*')
+        .eq('id', eventoId)
+        .single();
+
+      if (erroEvento) throw erroEvento;
+      setEvento(dadosEvento);
+
+      const { data: dadosEscalas, error: erroEscala } = await supabase
+        .from('escalas')
+        .select(`
+          id,
+          evento_id,
+          staff_id,
+          setor,
+          valor_pago,
+          status_pagamento,
+          status_presenca,
+          checkin_em,
+          checkout_em,
+          perfis (
+            id,
+            nome_completo,
+            cpf,
+            whatsapp,
+            chave_pix,
+            uniforme,
+            role,
+            cargo,
+            classificacao,
+            anotacoes,
+            foto_url
+          )
+        `)
+        .eq('evento_id', eventoId);
+
+      if (!erroEscala && dadosEscalas) {
+        setEscalas(dadosEscalas);
+        setTotalEscalados(dadosEscalas.length);
+      }
+
+    } catch (error) {
+      console.error("Erro ao carregar detalhes do evento:", error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [eventoId]);
+
+  useEffect(() => {
     if (eventoId) {
       fetchDetalhes();
     }
-  }, [eventoId]);
+  }, [eventoId, fetchDetalhes]);
+
+  const handleArquivarNoHistorico = async () => {
+    try {
+      const { error } = await supabase
+        .from("eventos")
+        .update({ escopo: "arquivado" })
+        .eq("id", eventoId);
+      if (error) throw error;
+      setEvento((prev) => (prev ? { ...prev, escopo: "arquivado" } : prev));
+      setModalAvaliacaoAberto(false);
+      alert("✅ Avaliações salvas e evento movido para a aba Histórico!");
+    } catch (err) {
+      console.error("Erro ao arquivar evento:", err);
+      alert("Erro ao enviar evento para o histórico.");
+    }
+  };
 
   const handleEnviarRelatorioVestuario = async () => {
     if (totalEscalados === 0) {
@@ -149,14 +210,10 @@ export default function DetalhesEvento() {
 
         if (res.ok) {
           deletado = true;
-        } else {
-          const json = await res.json().catch(() => ({}));
-          console.warn("Aviso rota API deletar evento:", json.error);
         }
       }
 
       if (!deletado) {
-        // Fallback direto
         await supabase
           .from("escalas")
           .delete()
@@ -211,14 +268,15 @@ export default function DetalhesEvento() {
     }
   }
 
-  // Verifica se o local possui mapa tático (Presidente Vargas ou flag no banco)
   const possuiMapaTatico = 
     evento.mapa_tatico === true || 
     (evento.endereco_texto && evento.endereco_texto.toLowerCase().includes("presidente vargas"));
 
+  const podeVerAvaliacoes = isGestorAutorizado(userRole || "admin");
+
   return (
     <div className="min-h-screen bg-[#171717] print:bg-white font-sans flex flex-col items-center">
-      <div className="w-full max-w-[500px] min-h-screen flex flex-col bg-[#1c1c1c] print:bg-white relative border-x border-[#2a2a2a] print:border-none">
+      <div className="w-full max-w-[540px] min-h-screen flex flex-col bg-[#1c1c1c] print:bg-white relative border-x border-[#2a2a2a] print:border-none">
         
         {/* CABEÇALHO */}
         <div className="print:hidden flex items-center justify-between p-5 border-b border-[#333333] sticky top-0 bg-[#1c1c1c] z-10 shadow-sm">
@@ -252,66 +310,59 @@ export default function DetalhesEvento() {
           </div>
         </div>
 
-        {/* CABEÇALHO EXCLUSIVO PARA O PDF */}
-        <div className="hidden print:block text-center pt-8 pb-4 border-b-2 border-black mb-6">
-          <h1 className="text-2xl font-black uppercase tracking-widest">Wadjet Segurança</h1>
-          <p className="text-sm text-gray-500 uppercase tracking-widest mt-1">Relatório Oficial de Operação</p>
-        </div>
-
         {/* IMAGEM DO EVENTO */}
-        <div className="w-full h-[200px] bg-[#111] print:bg-gray-200 relative border-b border-[#333] print:border-black">
+        <div className="w-full h-[200px] bg-[#111] relative border-b border-[#333]">
           {evento.foto_local ? (
-            <img src={evento.foto_local} alt={evento.titulo} className="w-full h-full object-cover print:opacity-80" />
+            <img src={evento.foto_local} alt={evento.titulo} className="w-full h-full object-cover" />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center text-[#555] print:text-black">
+            <div className="w-full h-full flex flex-col items-center justify-center text-[#555]">
               <ImageIcon size={40} className="mb-2" />
               <span className="text-[14px]">Sem imagem do local</span>
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#1c1c1c] to-transparent print:hidden"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-[#1c1c1c] to-transparent"></div>
         </div>
 
         {/* INFORMAÇÕES PRINCIPAIS */}
-        <div className="p-6 -mt-10 print:mt-4 relative z-0">
-          <div className="bg-[#222] print:bg-white border border-[#3a3a3a] print:border-black rounded-md p-5 shadow-lg print:shadow-none">
-            <h2 className="text-[#e5e5e5] print:text-black text-[24px] font-bold leading-tight uppercase tracking-wide mb-1">
-              {evento.titulo}
-            </h2>
-            <div className="flex items-center gap-2 text-[#2563eb] print:text-gray-700 text-[14px] font-semibold uppercase mb-5">
+        <div className="p-6 -mt-10 relative z-0">
+          <div className="bg-[#222] border border-[#3a3a3a] rounded-md p-5 shadow-lg">
+            <div className="flex items-start justify-between gap-2">
+              <h2 className="text-[#e5e5e5] text-[22px] font-bold leading-tight uppercase tracking-wide mb-1">
+                {evento.titulo}
+              </h2>
+              {evento.escopo === "arquivado" && (
+                <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 text-[10px] font-bold uppercase flex items-center gap-1 shrink-0">
+                  <History size={11} /> No Histórico
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-[#2563eb] text-[14px] font-semibold uppercase mb-5">
               <Briefcase size={16} />
               {evento.nome_contratante || "Contratante não informado"}
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-start gap-3 text-[#ccc] print:text-black">
-                <Calendar className="text-[#777] print:text-black mt-0.5 shrink-0" size={20} />
+              <div className="flex items-start gap-3 text-[#ccc]">
+                <Calendar className="text-[#777] mt-0.5 shrink-0" size={20} />
                 <div>
-                  <p className="text-[13px] text-[#777] print:text-gray-600 uppercase tracking-wider font-semibold">Data da Operação</p>
+                  <p className="text-[13px] text-[#777] uppercase tracking-wider font-semibold">Data da Operação</p>
                   <p className="text-[16px] font-medium">{dataFormatada}</p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 text-[#ccc] print:text-black">
-                <Clock className="text-[#777] print:text-black mt-0.5 shrink-0" size={20} />
+              <div className="flex items-start gap-3 text-[#ccc]">
+                <Clock className="text-[#777] mt-0.5 shrink-0" size={20} />
                 <div>
-                  <p className="text-[13px] text-[#777] print:text-gray-600 uppercase tracking-wider font-semibold">Horário</p>
+                  <p className="text-[13px] text-[#777] uppercase tracking-wider font-semibold">Horário</p>
                   <p className="text-[16px] font-medium">{horaFormatada}</p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 text-[#ccc] print:text-black">
-                <MapPin className="text-[#777] print:text-black mt-0.5 shrink-0" size={20} />
+              <div className="flex items-start gap-3 text-[#ccc]">
+                <MapPin className="text-[#777] mt-0.5 shrink-0" size={20} />
                 <div>
-                  <p className="text-[13px] text-[#777] print:text-gray-600 uppercase tracking-wider font-semibold">Local (Endereço)</p>
+                  <p className="text-[13px] text-[#777] uppercase tracking-wider font-semibold">Local (Endereço)</p>
                   <p className="text-[16px] font-medium">{evento.endereco_texto || "Não informado"}</p>
-                </div>
-              </div>
-
-              <div className="hidden print:flex items-start gap-3 text-black pt-4 border-t border-gray-300 mt-4">
-                <Users className="text-black mt-0.5 shrink-0" size={20} />
-                <div>
-                  <p className="text-[13px] text-gray-600 uppercase tracking-wider font-semibold">Efetivo Total Escalado</p>
-                  <p className="text-[16px] font-bold">{totalEscalados} Seguranças</p>
                 </div>
               </div>
             </div>
@@ -319,7 +370,7 @@ export default function DetalhesEvento() {
         </div>
 
         {/* PAINEL DE CONTROLE */}
-        <div className="px-6 pb-8 flex-1 print:hidden">
+        <div className="px-6 pb-8 flex-1">
           <h3 className="text-[#999] text-[13px] uppercase tracking-widest font-bold mb-3">Painel de Controle</h3>
           
           <div className="flex flex-col gap-3">
@@ -391,10 +442,35 @@ export default function DetalhesEvento() {
                 </div>
                 <div>
                   <h4 className="text-[#e5e5e5] font-semibold text-[15px]">Acerto Financeiro</h4>
-                  <p className="text-[#999] text-[13px]">Balanço e pagamento da equipe</p>
+                  <p className="text-[#999] text-[13px]">Balanço, gastos e pagamento da equipe</p>
                 </div>
               </div>
             </div>
+
+            {/* ENCERRAMENTO DO EVENTO: CLASSIFICAÇÃO (OURO, PRATA, BRONZE) E ANOTAÇÕES — VISÍVEL APENAS PARA ADMIN, COORDENADORES E PRODUTORES */}
+            {podeVerAvaliacoes && (
+              <div 
+                onClick={() => setModalAvaliacaoAberto(true)}
+                className="bg-[#2a2a2a] border border-yellow-500/40 hover:border-yellow-400 p-4 rounded-sm flex items-center justify-between cursor-pointer transition-colors group shadow-sm"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-yellow-500/15 rounded-full flex items-center justify-center text-yellow-400 shrink-0">
+                    <Award size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-[#e5e5e5] font-semibold text-[15px] flex items-center gap-2 flex-wrap">
+                      Classificar Staff & Anotações (Encerramento)
+                      <span className="text-[10px] bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">
+                        Ouro • Prata • Bronze
+                      </span>
+                    </h4>
+                    <p className="text-[#999] text-[13px]">
+                      Avaliar equipe escalada e registrar anotações confidenciais do evento
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Relatório de Vestuário para Coordenadores */}
             <div 
@@ -409,11 +485,11 @@ export default function DetalhesEvento() {
                   <h4 className="text-[#e5e5e5] font-semibold text-[15px] flex items-center gap-2">
                     Relatório de Vestuário
                     <span className="text-[10px] bg-[#10b981]/20 text-emerald-400 border border-[#10b981]/40 px-1.5 py-0.5 rounded uppercase tracking-wider font-bold">
-                      {vestuarioEnviado ? "Enviado" : "Coordenadores"}
+                      {vestuarioEnviado ? "Enviado" : "Admin & Escalados"}
                     </span>
                   </h4>
                   <p className="text-[#999] text-[13px]">
-                    {enviandoVestuario ? "Disparando relatório..." : "Enviar resumo de tamanhos aos coordenadores da partida"}
+                    {enviandoVestuario ? "Disparando relatório..." : "Enviar resumo de tamanhos para admins e coordenadores/produtores escalados"}
                   </p>
                 </div>
               </div>
@@ -442,26 +518,28 @@ export default function DetalhesEvento() {
               </div>
             </div>
 
-            {/* Exportar Relatório / PDF */}
-            <div 
-              onClick={() => window.print()}
-              className="bg-[#2a2a2a] border border-[#3a3a3a] hover:border-[#3b82f6] p-4 rounded-sm flex items-center justify-between cursor-pointer transition-colors group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#3b82f6]/10 rounded-full flex items-center justify-center text-[#3b82f6]">
-                  <Printer size={20} />
-                </div>
-                <div>
-                  <h4 className="text-[#e5e5e5] font-semibold text-[15px]">Exportar Relatório</h4>
-                  <p className="text-[#999] text-[13px]">Imprimir ou salvar em PDF</p>
-                </div>
-              </div>
-            </div>
+            {/* NOVA CENTRAL ILUSTRATIVA DE EXPORTAR / BAIXAR PDF / COMPARTILHAR RELATÓRIO COMPLETO */}
+            <RelatorioEventoHub
+              evento={evento}
+              escalas={escalas}
+              userRole={userRole || "admin"}
+            />
             
           </div>
         </div>
 
       </div>
+
+      {/* MODAL DE CLASSIFICAÇÃO E ANOTAÇÕES NO ENCERRAMENTO */}
+      <AvaliacaoEncerramentoModal
+        aberto={modalAvaliacaoAberto}
+        onClose={() => setModalAvaliacaoAberto(false)}
+        evento={evento}
+        escalas={escalas}
+        userRole={userRole || "admin"}
+        onSaved={fetchDetalhes}
+        onArchiveEvent={handleArquivarNoHistorico}
+      />
 
       {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
       {showConfirmDelete && (

@@ -20,8 +20,11 @@ import {
   Shield,
   X,
   UserCheck,
-  UserX
+  UserX,
+  Award,
+  FileText
 } from "lucide-react";
+import AvaliacaoEncerramentoModal, { isGestorAutorizado, BadgeClassificacao } from "@/components/AvaliacaoEncerramentoModal";
 
 export default function ListaPresencaCoordenador() {
   const router = useRouter();
@@ -44,6 +47,7 @@ export default function ListaPresencaCoordenador() {
 
   // Modal de Foto Ampliada
   const [fotoModal, setFotoModal] = useState(null); // { url, nome, horario, lat, lng }
+  const [modalAvaliacaoAberto, setModalAvaliacaoAberto] = useState(false);
 
   // 1. Verifica permissão (Admin, Owner ou Coordenador)
   useEffect(() => {
@@ -112,7 +116,11 @@ export default function ListaPresencaCoordenador() {
               nome_completo,
               foto_url,
               uniforme,
-              whatsapp
+              whatsapp,
+              classificacao,
+              anotacoes,
+              role,
+              cargo
             )
           `)
           .eq("evento_id", eventoId);
@@ -340,6 +348,16 @@ export default function ListaPresencaCoordenador() {
           </div>
 
           <div className="flex items-center gap-1.5">
+            {isGestorAutorizado(userRole) && (
+              <button
+                onClick={() => setModalAvaliacaoAberto(true)}
+                title="Classificar equipe (Ouro, Prata, Bronze) e anotações no encerramento"
+                className="text-[11px] bg-yellow-500/15 hover:bg-yellow-500/25 text-yellow-300 border border-yellow-500/40 px-2.5 py-1.5 rounded font-bold transition-colors cursor-pointer flex items-center gap-1"
+              >
+                <Award size={13} />
+                <span>Classificar / Encerrar</span>
+              </button>
+            )}
             <button
               onClick={handleDarSaidaGeral}
               title="Dar saída em lote para presentes"
@@ -514,9 +532,14 @@ export default function ListaPresencaCoordenador() {
 
                       {/* Nome e Dados */}
                       <div className="min-w-0">
-                        <h3 className="text-[14px] font-bold text-white truncate leading-snug">
-                          {perfil?.nome_completo || "Segurança sem nome"}
-                        </h3>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className="text-[14px] font-bold text-white truncate leading-snug">
+                            {perfil?.nome_completo || "Segurança sem nome"}
+                          </h3>
+                          {isGestorAutorizado(userRole) && perfil?.classificacao && (
+                            <BadgeClassificacao classificacao={perfil.classificacao} />
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 mt-0.5 text-[11px] text-neutral-400">
                           <span className="text-blue-400 font-semibold truncate">
                             {item.setor || "Setor Geral"}
@@ -527,6 +550,11 @@ export default function ListaPresencaCoordenador() {
                             </span>
                           )}
                         </div>
+                        {isGestorAutorizado(userRole) && perfil?.anotacoes && (
+                          <p className="text-[11px] text-amber-300/90 mt-1 truncate max-w-[260px]" title={perfil.anotacoes}>
+                            📝 {perfil.anotacoes}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -660,23 +688,81 @@ export default function ListaPresencaCoordenador() {
           )}
         </div>
 
-        {/* BARRA INFERIOR COM AÇÃO EM LOTE */}
-        <div className="sticky bottom-0 bg-[#1a1a1a] border-t border-[#2e2e2e] p-3 flex items-center justify-between gap-3">
+        {/* BARRA INFERIOR COM AÇÃO EM LOTE E CLASSIFICAÇÃO DE ENCERRAMENTO */}
+        <div className="sticky bottom-0 bg-[#1a1a1a] border-t border-[#2e2e2e] p-3 flex items-center justify-between gap-2">
           <div className="text-[11px] text-neutral-400">
             <span className="font-bold text-white">{presentesCount}</span> de {total} confirmados
           </div>
 
-          <button
-            type="button"
-            onClick={handleMarcarTodosPresentes}
-            className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white py-2 px-3.5 rounded text-[12px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <CheckCheck size={15} />
-            <span>Confirmar Todos</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {isGestorAutorizado(userRole) && (
+              <button
+                type="button"
+                onClick={() => setModalAvaliacaoAberto(true)}
+                className="bg-yellow-500 hover:bg-yellow-400 text-black py-2 px-3 rounded text-[12px] font-extrabold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Award size={15} />
+                <span>Classificar Equipe</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleMarcarTodosPresentes}
+              className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white py-2 px-3.5 rounded text-[12px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <CheckCheck size={15} />
+              <span>Confirmar Todos</span>
+            </button>
+          </div>
         </div>
 
       </div>
+
+      {/* MODAL DE CLASSIFICAÇÃO E ANOTAÇÕES NO ENCERRAMENTO DO EVENTO */}
+      <AvaliacaoEncerramentoModal
+        aberto={modalAvaliacaoAberto}
+        onClose={() => setModalAvaliacaoAberto(false)}
+        evento={evento}
+        escalas={equipe}
+        userRole={userRole}
+        onSaved={async () => {
+          const { data: escData } = await supabase
+            .from("escalas")
+            .select(`
+              id,
+              setor,
+              status_presenca,
+              checkin_em,
+              checkin_foto_url,
+              checkin_lat,
+              checkin_lng,
+              checkout_em,
+              checkout_foto_url,
+              checkin_manual,
+              perfis (
+                id,
+                nome_completo,
+                foto_url,
+                uniforme,
+                whatsapp,
+                classificacao,
+                anotacoes,
+                role,
+                cargo
+              )
+            `)
+            .eq("evento_id", eventoId);
+          if (escData) {
+            setEquipe(
+              escData.map((e) => ({
+                ...e,
+                status_presenca: e.status_presenca || (e.checkin_em ? "presente" : "pendente"),
+              }))
+            );
+          }
+        }}
+      />
 
       {/* MODAL DE AUDITORIA DE SELFIE COM GPS E HORÁRIO */}
       {fotoModal && (

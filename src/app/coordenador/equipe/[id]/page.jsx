@@ -226,8 +226,9 @@ export default function DetalhesStaffCoordenador() {
             </div>
           </div>
 
+          {isCoordenadorOrAdmin && (
           <div className="mt-8">
-            <p className="text-[#777] text-[12px] font-bold uppercase tracking-wider mb-4 flex items-center gap-2"><Award size={14}/> Gestão Interna (Morais)</p>
+            <p className="text-[#777] text-[12px] font-bold uppercase tracking-wider mb-4 flex items-center gap-2"><Award size={14}/> Gestão Interna (Admin, Coordenadores e Produtores)</p>
             
             {/* Cargo/Papel no Sistema */}
             <div className="bg-[#222] border border-[#333] rounded-md p-5 mb-4">
@@ -317,6 +318,7 @@ export default function DetalhesStaffCoordenador() {
               )}
             </div>
           </div>
+          )}
 
         </div>
       </div>

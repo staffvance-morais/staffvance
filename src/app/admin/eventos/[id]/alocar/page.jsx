@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { ArrowLeft, Search, Check, Shield, Save, Loader2, Users } from "lucide-react";
 import { enviarEmailEscalacao } from "@/app/actions/email"; // Importando a função do e-mail
+import { BadgeClassificacao } from "@/components/AvaliacaoEncerramentoModal";
 
 
 function AlocarEquipeConteudo() {
@@ -67,6 +68,8 @@ function AlocarEquipeConteudo() {
               nome: p.nome_completo || p.nome || "Staff sem nome",
               email: p.email, // Garantindo que o e-mail seja passado
               funcao: p.role || 'Staff Tático',
+              classificacao: p.classificacao || "",
+              anotacoes: p.anotacoes || "",
               foto: p.foto_url || null,
               escalaId: escalaExistente ? escalaExistente.id : null,
               estaNesteSetorOriginalmente: estaNesteSetor,
@@ -225,9 +228,15 @@ function AlocarEquipeConteudo() {
                     {membro.foto ? <img src={membro.foto} alt={membro.nome} className="w-full h-full object-cover" /> : <Shield size={20} className={membro.selecionado ? "text-[#3b82f6]" : "text-[#777]"} />}
                   </div>
                   <div>
-                    <h3 className={`text-[16px] font-semibold tracking-wide capitalize ${membro.selecionado ? 'text-white' : 'text-[#e5e5e5]'}`}>{membro.nome}</h3>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className={`text-[16px] font-semibold tracking-wide capitalize ${membro.selecionado ? 'text-white' : 'text-[#e5e5e5]'}`}>{membro.nome}</h3>
+                      {membro.classificacao && <BadgeClassificacao classificacao={membro.classificacao} />}
+                    </div>
                     <div className="text-[#999999] text-[13px] mt-0.5 flex flex-col items-start gap-1">
                       <span className="capitalize">{membro.funcao}</span>
+                      {membro.anotacoes && (
+                        <span className="text-[11px] text-amber-300/80 line-clamp-1">📝 {membro.anotacoes}</span>
+                      )}
                       {membro.estaEmOutroSetor && !membro.selecionado && (
                         <span className="text-[#eab308] text-[11px] font-bold uppercase tracking-wider bg-[#eab308]/10 px-2 py-0.5 rounded-sm">Já escalado: {membro.estaEmOutroSetor}</span>
                       )}

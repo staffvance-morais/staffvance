@@ -16,12 +16,11 @@ import {
   Menu,
   Loader2,
   Archive,
-  ArchiveRestore
+  ArchiveRestore,
+  History
 } from "lucide-react";
 
-// Conexão com o Supabase
-
-const EventCard = ({ id, image, title, location, date, time, client, staffCount, isLive, isPassado, isArquivado, selected, router, onArchiveClick, onUnarchiveClick }) => {
+const EventCard = ({ id, image, title, location, date, time, client, staffCount, isLive, isPassado, isArquivado, isNoHistorico, selected, router, onArchiveClick, onUnarchiveClick }) => {
   return (
     <div className="border border-[#3a3a3a] bg-[#222222] flex flex-col mb-4 rounded-sm overflow-hidden shrink-0">
       <div className="h-[100px] w-full relative border-b border-[#3a3a3a] bg-[#1a1a1a]">
@@ -38,11 +37,11 @@ const EventCard = ({ id, image, title, location, date, time, client, staffCount,
           </div>
         ) : isArquivado ? (
           <div className="absolute top-2 right-2 bg-black/80 border border-amber-500/50 px-2 py-0.5 rounded-sm text-amber-400 text-[11px] font-bold tracking-wider uppercase flex items-center gap-1">
-            <Archive size={11} /> Arquivado
+            <History size={11} /> Histórico (Arquivado)
           </div>
         ) : isPassado ? (
-          <div className="absolute top-2 right-2 bg-black/80 border border-[#555] px-2 py-0.5 rounded-sm text-[#999] text-[11px] font-bold tracking-wider uppercase">
-            Encerrado
+          <div className="absolute top-2 right-2 bg-black/80 border border-blue-500/40 px-2 py-0.5 rounded-sm text-blue-300 text-[11px] font-bold tracking-wider uppercase flex items-center gap-1">
+            <History size={11} /> Histórico (Encerrado)
           </div>
         ) : null}
       </div>
@@ -76,28 +75,28 @@ const EventCard = ({ id, image, title, location, date, time, client, staffCount,
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Botão de Arquivar (para eventos encerrados e não arquivados) */}
-            {isPassado && !isArquivado && (
+            {/* Botão de Enviar para o Histórico / Arquivar */}
+            {!isArquivado && (
               <button 
                 onClick={(e) => {
                   e.preventDefault();
                   onArchiveClick({ id, title });
                 }}
-                title="Arquivar Evento"
+                title="Arquivar no Histórico"
                 className="w-11 h-11 border border-amber-900/60 rounded-sm bg-amber-950/40 flex items-center justify-center text-amber-400 hover:bg-amber-950 hover:border-amber-600 hover:text-amber-200 transition-colors cursor-pointer"
               >
                 <Archive size={19} strokeWidth={1.8} />
               </button>
             )}
 
-            {/* Botão de Desarquivar (para eventos já arquivados) */}
-            {isArquivado && (
+            {/* Botão de Restaurar para Ativos */}
+            {isNoHistorico && (
               <button 
                 onClick={(e) => {
                   e.preventDefault();
                   onUnarchiveClick({ id, title });
                 }}
-                title="Desarquivar Evento"
+                title="Restaurar para Eventos Ativos"
                 className="w-11 h-11 border border-blue-900/60 rounded-sm bg-blue-950/40 flex items-center justify-center text-blue-400 hover:bg-blue-950 hover:border-blue-600 hover:text-blue-200 transition-colors cursor-pointer"
               >
                 <ArchiveRestore size={19} strokeWidth={1.8} />
@@ -124,8 +123,8 @@ export default function PainelEventosCoordenador() {
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState("");
 
-  // Estado para arquivamento e visualização
-  const [aba, setAba] = useState("ativos"); // "ativos" | "arquivados"
+  // Aba de visualização: "ativos" | "historico"
+  const [aba, setAba] = useState("ativos");
   const [showMaisOpcoes, setShowMaisOpcoes] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(null); // { id, title }
   const [arquivando, setArquivando] = useState(false);
@@ -151,16 +150,22 @@ export default function PainelEventosCoordenador() {
           let isPassado = false;
 
           if (ev.data_inicio) {
-            const d = new Date(ev.data_inicio);
-            dataFormatada = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-            horaFormatada = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + " - " + 
+            const dInicio = new Date(ev.data_inicio);
+            dataFormatada = dInicio.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+            horaFormatada = dInicio.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + " - " + 
               (ev.data_fim ? new Date(ev.data_fim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : "");
             
-            const dataFinal = ev.data_fim ? new Date(ev.data_fim) : d;
+            let dataFinal = ev.data_fim ? new Date(ev.data_fim) : new Date(dInicio);
+            if (ev.data_fim && dataFinal <= dInicio) {
+              dataFinal = new Date(dataFinal.getTime() + 24 * 60 * 60 * 1000);
+            }
             isPassado = dataFinal < agora;
           }
 
           const isArquivado = ev.escopo === 'arquivado';
+          const isRestauradoManual = ev.escopo === 'ativo_manual';
+          // Eventos arquivados E eventos passados ficam juntos no Histórico
+          const isNoHistorico = isArquivado || (isPassado && !isRestauradoManual);
           const count = escData ? escData.filter(esc => esc.evento_id === ev.id).length : 0;
 
           return {
@@ -175,6 +180,7 @@ export default function PainelEventosCoordenador() {
             isLive: false,
             isPassado,
             isArquivado,
+            isNoHistorico,
             selected: true
           };
         });
@@ -204,7 +210,7 @@ export default function PainelEventosCoordenador() {
 
       if (error) throw error;
 
-      setEventos(prev => prev.map(e => e.id === confirmArchive.id ? { ...e, isArquivado: true } : e));
+      setEventos(prev => prev.map(e => e.id === confirmArchive.id ? { ...e, isArquivado: true, isNoHistorico: true } : e));
       setConfirmArchive(null);
     } catch (err) {
       console.error("Erro ao arquivar evento:", err);
@@ -214,26 +220,26 @@ export default function PainelEventosCoordenador() {
     }
   };
 
-  const handleDesarquivar = async (evInfo) => {
+  const handleRestaurarDoHistorico = async (evInfo) => {
     try {
       const { error } = await supabase
         .from('eventos')
-        .update({ escopo: null })
+        .update({ escopo: 'ativo_manual' })
         .eq('id', evInfo.id);
 
       if (error) throw error;
 
-      setEventos(prev => prev.map(e => e.id === evInfo.id ? { ...e, isArquivado: false } : e));
+      setEventos(prev => prev.map(e => e.id === evInfo.id ? { ...e, isArquivado: false, isNoHistorico: false } : e));
     } catch (err) {
-      console.error("Erro ao desarquivar evento:", err);
-      alert("Erro ao desarquivar evento: " + (err.message || "Tente novamente"));
+      console.error("Erro ao restaurar evento do histórico:", err);
+      alert("Erro ao restaurar evento: " + (err.message || "Tente novamente"));
     }
   };
 
-  const totalAtivos = eventos.filter(ev => !ev.isArquivado).length;
-  const totalArquivados = eventos.filter(ev => ev.isArquivado).length;
+  const totalAtivos = eventos.filter(ev => !ev.isNoHistorico).length;
+  const totalHistorico = eventos.filter(ev => ev.isNoHistorico).length;
 
-  const eventosPorAba = eventos.filter(ev => aba === 'arquivados' ? ev.isArquivado : !ev.isArquivado);
+  const eventosPorAba = eventos.filter(ev => aba === 'historico' ? ev.isNoHistorico : !ev.isNoHistorico);
 
   const eventosFiltrados = eventosPorAba.filter(ev => 
     ev.title?.toLowerCase().includes(busca.toLowerCase()) ||
@@ -247,30 +253,59 @@ export default function PainelEventosCoordenador() {
         
         {/* CABEÇALHO */}
         <div className="flex items-center gap-3 text-[#cccccc] pb-3 border-b border-[#333333]">
-          <CalendarDays size={20} strokeWidth={1.5} />
-          <h1 className="text-[17px] tracking-wide">
-            {aba === 'arquivados' ? 'Eventos Arquivados' : 'Eventos'}
+          {aba === 'historico' ? <History size={20} className="text-blue-400" /> : <CalendarDays size={20} strokeWidth={1.5} />}
+          <h1 className="text-[17px] tracking-wide font-semibold">
+            {aba === 'historico' ? 'Histórico de Eventos' : 'Eventos'}
           </h1>
         </div>
 
+        {/* SELETOR DE ABAS: ATIVOS vs HISTÓRICO */}
+        <div className="grid grid-cols-2 gap-2 mt-3 shrink-0 bg-[#202020] p-1 rounded-sm border border-[#333]">
+          <button
+            type="button"
+            onClick={() => setAba("ativos")}
+            className={`py-2 px-3 rounded-sm text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+              aba === "ativos"
+                ? "bg-[#2563eb] text-white shadow"
+                : "text-[#999] hover:text-white"
+            }`}
+          >
+            <CalendarDays size={14} />
+            <span>Ativos ({totalAtivos})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAba("historico")}
+            className={`py-2 px-3 rounded-sm text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+              aba === "historico"
+                ? "bg-[#2563eb] text-white shadow"
+                : "text-[#999] hover:text-white"
+            }`}
+          >
+            <History size={14} />
+            <span>Histórico ({totalHistorico})</span>
+          </button>
+        </div>
+
         {/* BARRA DE PESQUISA */}
-        <div className="mt-4 relative shrink-0">
+        <div className="mt-3 relative shrink-0">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#777]" size={22} strokeWidth={1.5} />
           <input 
             type="text" 
             placeholder="Toque para pesquisar" 
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            className="w-full bg-[#2a2a2a] border border-[#3a3a3a] text-[#e5e5e5] py-3.5 pl-[46px] pr-4 outline-none text-[17px] rounded-sm placeholder:text-[#777] focus:border-[#555] transition-colors" 
+            className="w-full bg-[#2a2a2a] border border-[#3a3a3a] text-[#e5e5e5] py-3 pl-[46px] pr-4 outline-none text-[16px] rounded-sm placeholder:text-[#777] focus:border-[#555] transition-colors" 
           />
         </div>
 
         {/* CONTAGEM DE LISTA */}
-        <div className="mt-4 mb-3 text-[14px] text-[#999999] tracking-wide shrink-0 flex items-center justify-between">
+        <div className="mt-3 mb-2.5 text-[13px] text-[#999999] tracking-wide shrink-0 flex items-center justify-between">
           <div>
-            Listando <span className="text-[#e5e5e5] font-semibold">{eventosFiltrados.length}</span> {aba === 'arquivados' ? 'eventos arquivados' : 'eventos'}
+            Listando <span className="text-[#e5e5e5] font-semibold">{eventosFiltrados.length}</span> {aba === 'historico' ? 'evento(s) no histórico' : 'evento(s) ativo(s)'}
           </div>
-          {aba === 'arquivados' && (
+          {aba === 'historico' && (
             <button
               onClick={() => setAba('ativos')}
               className="text-xs text-blue-400 hover:text-blue-300 underline font-medium cursor-pointer"
@@ -288,14 +323,14 @@ export default function PainelEventosCoordenador() {
               <p className="text-sm">Carregando eventos do banco...</p>
             </div>
           ) : eventosFiltrados.length === 0 ? (
-            <div className="text-center py-20 text-[#777] bg-[#222] rounded-sm border border-[#333]">
+            <div className="text-center py-16 px-4 text-[#777] bg-[#222] rounded-sm border border-[#333]">
               <p className="font-semibold text-[#e5e5e5] mb-1">
-                {aba === 'arquivados' ? 'Nenhum evento arquivado.' : 'Nenhum evento encontrado.'}
+                {aba === 'historico' ? 'Nenhum evento no histórico.' : 'Nenhum evento ativo encontrado.'}
               </p>
               <p className="text-[13px]">
-                {aba === 'arquivados' 
-                  ? 'Eventos passados arquivados aparecerão aqui.' 
-                  : 'Cadastre o primeiro evento usando o botão abaixo.'}
+                {aba === 'historico' 
+                  ? 'Eventos encerrados e arquivados ficam reunidos aqui no Histórico.' 
+                  : 'Cadastre um novo evento ou consulte a aba Histórico.'}
               </p>
             </div>
           ) : (
@@ -313,10 +348,11 @@ export default function PainelEventosCoordenador() {
                 isLive={ev.isLive}
                 isPassado={ev.isPassado}
                 isArquivado={ev.isArquivado}
+                isNoHistorico={ev.isNoHistorico}
                 selected={ev.selected}
                 router={router} 
                 onArchiveClick={(evInfo) => setConfirmArchive(evInfo)}
-                onUnarchiveClick={(evInfo) => handleDesarquivar(evInfo)}
+                onUnarchiveClick={(evInfo) => handleRestaurarDoHistorico(evInfo)}
               />
             ))
           )}
@@ -350,21 +386,21 @@ export default function PainelEventosCoordenador() {
               <button
                 type="button"
                 onClick={() => {
-                  setAba(aba === 'ativos' ? 'arquivados' : 'ativos');
+                  setAba(aba === 'ativos' ? 'historico' : 'ativos');
                   setShowMaisOpcoes(false);
                 }}
                 className={`w-full py-2.5 px-3 rounded-sm flex items-center justify-between text-[14px] font-semibold transition-colors cursor-pointer ${
-                  aba === 'arquivados' 
+                  aba === 'historico' 
                     ? 'bg-[#2563eb] text-white' 
                     : 'bg-[#2a2a2a] hover:bg-[#333] text-[#ccc] border border-[#3a3a3a]'
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <Archive size={16} />
-                  <span>{aba === 'arquivados' ? 'Exibir eventos ativos' : 'Ver eventos arquivados'}</span>
+                  <History size={16} />
+                  <span>{aba === 'historico' ? 'Exibir eventos ativos' : 'Ver histórico de eventos'}</span>
                 </div>
                 <span className="text-xs bg-black/40 px-2 py-0.5 rounded-full">
-                  {aba === 'arquivados' ? `${totalAtivos} ativos` : `${totalArquivados} arquivados`}
+                  {aba === 'historico' ? `${totalAtivos} ativos` : `${totalHistorico} no histórico`}
                 </span>
               </button>
             </div>
@@ -392,7 +428,7 @@ export default function PainelEventosCoordenador() {
 
       </div>
 
-      {/* MODAL DE CONFIRMAÇÃO DE ARQUIVAMENTO */}
+      {/* MODAL DE CONFIRMAÇÃO DE ARQUIVAMENTO PARA O HISTÓRICO */}
       {confirmArchive && (
         <div 
           className="fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-6"
@@ -404,16 +440,16 @@ export default function PainelEventosCoordenador() {
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-amber-950 border border-amber-800 rounded-sm flex items-center justify-center shrink-0">
-                <Archive size={20} className="text-amber-400" />
+                <History size={20} className="text-amber-400" />
               </div>
               <div>
-                <h3 className="text-white font-bold text-base leading-tight">Arquivar evento</h3>
-                <p className="text-gray-400 text-xs mt-0.5">O evento sairá da tela principal</p>
+                <h3 className="text-white font-bold text-base leading-tight">Enviar para Histórico</h3>
+                <p className="text-gray-400 text-xs mt-0.5">O evento ficará na aba Histórico</p>
               </div>
             </div>
 
             <p className="text-gray-300 text-sm leading-relaxed">
-              Deseja arquivar o evento <strong className="text-white font-semibold">&quot;{confirmArchive.title}&quot;</strong>? Ele continuará salvo no histórico e poderá ser acessado em &quot;Mais opções...&quot;.
+              Deseja arquivar o evento <strong className="text-white font-semibold">&quot;{confirmArchive.title}&quot;</strong>? Ele ficará salvo junto aos demais eventos encerrados na aba <strong>Histórico</strong>.
             </p>
 
             <div className="flex gap-2 pt-1">
@@ -433,12 +469,12 @@ export default function PainelEventosCoordenador() {
               >
                 {arquivando ? (
                   <span className="flex items-center gap-1.5">
-                    <Loader2 size={15} className="animate-spin" /> Arquivando...
+                    <Loader2 size={15} className="animate-spin" /> Salvando...
                   </span>
                 ) : (
                   <>
-                    <Archive size={15} />
-                    Arquivar
+                    <History size={15} />
+                    Confirmar
                   </>
                 )}
               </button>
