@@ -6,7 +6,7 @@ let cachedCredentialsKey = null;
 
 /**
  * Cria ou retorna o transporter do Nodemailer com pool de conexões e sanitização de credenciais.
- * Remove espaços de senhas de aplicativo do Google geradas em blocos (ex: "vzeu mgsl ezhk mjde").
+ * Remove espaços de senhas de aplicativo do Google geradas em blocos.
  */
 export function getEmailTransporter() {
   const user = (process.env.EMAIL_USER || '').trim();
